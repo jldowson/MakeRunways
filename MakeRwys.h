@@ -2,9 +2,6 @@
 *******************************************************************************/
 
 //#define HEX 1
-#define CSV 1
-#define RWSLIST 1
-#define RWS 1
 #define PI 3.14159265358979
 
 #define _CRT_SECURE_NO_DEPRECATE
@@ -215,7 +212,6 @@ typedef struct
 	BYTE nStrobes;			// 72
 	char chNameILS[32];		// 73
 	BYTE bSpare[3];			// 105
-#ifdef ADDMOREVASI
 	float fLeftBiasX;		// 108
 	float fLeftBiasZ;		// 112
 	float fLeftSpacing;		// 116
@@ -224,7 +220,6 @@ typedef struct
 	float fRightBiasZ;		// 128
 	float fRightSpacing;	// 132
 	float fRightPitch;		// 136
-#endif
 } RWYDATA;					// 108
 
 typedef struct
@@ -274,10 +269,8 @@ typedef struct _rwylist
 	char *pStateName;
 	char *pCityName;
 	char *pAirportName;
-#ifdef ADDFILEDETAILS
 	char *pPathName;
 	char *pSceneryName;
-#endif
 } RWYLIST;
 
 typedef struct

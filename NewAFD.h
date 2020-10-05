@@ -1,12 +1,6 @@
 // Thanks are due to Alessandro G. Antonini, author of BGLXML, for much of this data
-#define ADDMOREVASI 1
-#define ADDFILEDETAILS 1
-
-#ifdef ADDFILEDETAILS
-	extern char *pPathName;
-	extern char *pSceneryName;
-#endif
-
+extern char *pPathName;
+extern char *pSceneryName;
 
 typedef struct _NSECTS
 {

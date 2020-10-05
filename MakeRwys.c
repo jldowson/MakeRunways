@@ -18,10 +18,8 @@ void UpdateTransitionAlts(void);
 char *pszSimName[8] = {
 	"FS9", "FSX", "FSX-SE", "Prepar3D", "Prepar3D v2",
 	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5" };
-#ifdef ADDFILEDETAILS
 	char *pPathName = 0;
 	char *pSceneryName = 0;
-#endif
 HINSTANCE hInstance;
 
 /******************************************************************************
@@ -910,7 +908,7 @@ void ScanSceneryArea(char *pszPath)
 
 	strcat(szParam, "\\scenery");
 	if ((GetFileAttributes(szParam) != FILE_ATTRIBUTE_DIRECTORY) && (fpos > 8) &&
-			(strnicmp(&szParam[fpos-8], "\\scenery", 8) == 0))
+			(_strnicmp(&szParam[fpos-8], "\\scenery", 8) == 0))
 		// Scenery path is complete already!
 		szParam[fpos] = 0;
 	else
@@ -932,11 +930,9 @@ void ScanSceneryArea(char *pszPath)
 								
 			fpIn = fopen(szParam, "rb");
 
-#ifdef ADDFILEDETAILS
 			strcpy(pNextPathName, szParam);
 			pPathName = pNextPathName;
 			pNextPathName += strlen(pNextPathName) + 1;
-#endif
 
 			if (fpIn)
 			{	BOOL fDone = FALSE;
@@ -980,6 +976,60 @@ void ScanSceneryArea(char *pszPath)
 }
 
 /******************************************************************************
+		 ProcessMSFSCommunity
+******************************************************************************/
+
+ProcessMSFSCommunity(char* pPath)
+{
+}
+
+/******************************************************************************
+		 ProcessMSFSOfficial
+******************************************************************************/
+
+ProcessMSFSOfficial(char* pPath)
+{	char szPath[MAX_PATH];
+	HANDLE hFind;
+	HANDLE hFile;
+	WIN32_FIND_DATA fd;
+	
+	strcpy(szPath, pPath);
+	strcat(szPath, "*.BGL");
+
+	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
+	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+	{	// found a scenery layer - add it to the list ...
+		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
+			fprintf(fpAFDS, "ENCRYPTED=");
+		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
+	}
+
+	FindClose(hFind);
+	hFind = INVALID_HANDLE_VALUE;
+	
+	strcpy(szPath, pPath);
+	strcat(szPath, "*.*");
+
+	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
+	while (hFind != INVALID_HANDLE_VALUE)
+	{	// Check for directory
+		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+				strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
+				(strnicmp(fd.cFileName, "asobo", 5) || (strnicmp(fd.cFileName, "asobo-airport", 13) == 0)))
+		{	strcpy(szPath, pPath);
+			strcat(szPath, fd.cFileName);
+			strcat(szPath, "\\");
+			ProcessMSFSOfficial(szPath);
+		}
+	
+		if (!FindNextFile(hFind, (WIN32_FIND_DATA*) &fd))
+		{	FindClose(hFind);
+			hFind = INVALID_HANDLE_VALUE;
+		}
+	}
+}
+
+/******************************************************************************
          MainRoutine
 ******************************************************************************/
 
@@ -993,10 +1043,8 @@ char *pNextCityName = chCityNames;
 char *pNextStateName = chStateNames;
 char *pNextCountryName = chCountryNames;
 
-#ifdef ADDFILEDETAILS
 char chPathNames[60000000], chWk[1024];
 char *pNextPathName = chPathNames;
-#endif
 
 DWORD WINAPI MainRoutine (PVOID pvoid)
 {	char szArea[512], szParam[64];
@@ -1008,11 +1056,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	static char szTitles[10000][64];
 	static char szPaths[10000][MAX_PATH];
 	static BYTE bActive[10000];
-
-	EXCEPTION_RECORD ExRec;
-	CONTEXT CxRec;
-
-	__try{
 
 	memset(&nAreas[0], 0xff, sizeof(nAreas));
 	memset(&bActive[0], 0, sizeof(bActive));
@@ -1066,7 +1109,28 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			}
 		}
 		
-		if (fFSX < 0) fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
+		if (fFSX < 0)
+			fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
+	}
+
+	if (fFSX < 0)
+	{	// See if it is MSFS
+		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
+		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
+			int fsPathLen = strlen(szCfgPath);
+		strcat(szCfgPath, "Official\\OneStore\\");
+		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
+		{	fprintf(fpAFDS, "Found MSFS official scenery in: \n  \x22%s\x22\n", szCfgPath);
+			ProcessMSFSOfficial(szCfgPath);
+		}
+		
+		strcpy(&szCfgPath[fsPathLen], "Community");
+		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
+		{	fprintf(fpAFDS, "Found MSFS community scenery in: \n  \x22%s\x22\n", szCfgPath);
+			ProcessMSFSCommunity(szCfgPath);
+		}
+
+		goto FINISHOFF;
 	}
 
 	fprintf(fpAFDS, "Reading %s scenery:\n", pszSimName[fFSX+1]);	
@@ -1113,29 +1177,28 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			}
 
 			fDeletionsPass = 1;
-			
+
 			// Repeat next part if finds any Airports
 			// First pass = deletions, second = inclusions
 
-			if ((len = strlen(szPaths[nArea])) && (szPaths[nArea][len-1] == '\\'))
-				szPaths[nArea][len-1] = 0;
+			if ((len = strlen(szPaths[nArea])) && (szPaths[nArea][len - 1] == '\\'))
+				szPaths[nArea][len - 1] = 0;
 
 			ScanSceneryArea(szPaths[nArea]);
 			if (fUserAbort) return 0;
 
 			if (fDeletionsPass < 0)
 			{	fDeletionsPass = 0;
-#ifdef ADDFILEDETAILS
 				pSceneryName = szTitles[nArea];
-#endif
 				ScanSceneryArea(szPaths[nArea]);
 				if (fUserAbort) return 0;
 			}
 		}
-
+	
 		nArea++;
 	}
 
+FINISHOFF:
 	fprintf(fpAFDS, "\n");
 	fprintf(fpAFDS, chLine);
 
@@ -1147,24 +1210,22 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		FILE *pf, *pf2, *pfg = 0, *pfmyg = 0, *pft = 0, *pfi = 0, *pfbin = 0, *pftbin = 0;
 		BOOL ftmi = TRUE;
 		
-		#ifdef RWS
-			// Create binary file with runway data
-			p = pR;
-			pf = fopen("FstarRC.rws","wb");
-			if (pf)
-			{	while (p)
-				{	RWYLIST *pLast = p;
-					if (!p->fDelete && !p->fAirport &&
-							(*((DWORD *) &p->r.chRwy[0]) != 0x00383939) &&
-							(*((DWORD *) &p->r.chRwy[0]) != 0x00393939))
-						fwrite(&p->r, 40, 1, pf);
-					p = p->pTo;
-				}
-
-				fclose(pf);
-				fOk = 1;
+		// Create binary file with runway data
+		p = pR;
+		pf = fopen("FstarRC.rws","wb");
+		if (pf)
+		{	while (p)
+			{	RWYLIST *pLast = p;
+				if (!p->fDelete && !p->fAirport &&
+						(*((DWORD *) &p->r.chRwy[0]) != 0x00383939) &&
+						(*((DWORD *) &p->r.chRwy[0]) != 0x00393939))
+					fwrite(&p->r, 40, 1, pf);
+				p = p->pTo;
 			}
-		#endif
+
+			fclose(pf);
+			fOk = 1;
+		}
 
 		// Create binary fsm and bin files with runway data
 		p = pR;
@@ -1192,42 +1253,41 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			pf = 0;
 		}
 		
-		#ifdef CSV
-			// Create csv files with runway data
-			p = pR;
-			pf = fopen("runways.csv","wb");
-			if (pf)
-			{	while (p)
-				{	if (!p->fDelete && !p->fAirport && 
-								((p->r.chRwy[3] < '4') || fIncludeWater) &&
-								((p->r.chRwy[3] >= '4') || (fIncludeWater >= 0)) &&
-								!p->pGateList && !p->pTaxiwayList &&
-							p->r.chRwy[3]) // This last eliminates 998 and 999 maker entries
-					{	if (p->r.chICAO[3] == ' ') p->r.chICAO[3] = 0;
-						fprintf(pf,"%.4s,%.4s,%.6f,%.6f,%d,%d,%d,%.6s\x0d\x0a",
-									p->r.chICAO, p->r.chRwy,
-									(double) p->r.fLat, (double) p->r.fLong,
-									(int) (p->r.fAlt + 0.5), p->r.uHdg,
-									p->r.uLen, p->r.chILS[0] ? p->r.chILS : "0");
-					}
-					p = p->pTo;
+		// Create csv files with runway data
+		p = pR;
+		pf = fopen("runways.csv","wb");
+		if (pf)
+		{	while (p)
+			{	if (!p->fDelete && !p->fAirport && 
+							((p->r.chRwy[3] < '4') || fIncludeWater) &&
+							((p->r.chRwy[3] >= '4') || (fIncludeWater >= 0)) &&
+							!p->pGateList && !p->pTaxiwayList &&
+						p->r.chRwy[3]) // This last eliminates 998 and 999 maker entries
+				{	if (p->r.chICAO[3] == ' ') p->r.chICAO[3] = 0;
+					fprintf(pf,"%.4s,%.4s,%.6f,%.6f,%d,%d,%d,%.6s\x0d\x0a",
+								p->r.chICAO, p->r.chRwy,
+								(double) p->r.fLat, (double) p->r.fLong,
+								(int) (p->r.fAlt + 0.5), p->r.uHdg,
+								p->r.uLen, p->r.chILS[0] ? p->r.chILS : "0");
 				}
-
-				fclose(pf);
-				fOk |= 2;
+				p = p->pTo;
 			}
 
-			p = pR;
-			pf = fopen("r4.csv", "wb");
-			pfbin = fopen("r5.bin","wb");
-			pf2 = fopen("r5.csv", "wb");
-			pfg = fopen("g5.csv", "wb");
-			if (nMatchMyAirline) pfmyg = fopen(chMyGates, "wb");
-			pft = fopen("t5.csv", "wb");
-			pftbin = fopen("t5.bin", "wb");
-			pfi = fopen("runways.xml", "wb");
+			fclose(pf);
+			fOk |= 2;
+		}
+
+		p = pR;
+		pf = fopen("r4.csv", "wb");
+		pfbin = fopen("r5.bin","wb");
+		pf2 = fopen("r5.csv", "wb");
+		pfg = fopen("g5.csv", "wb");
+		if (nMatchMyAirline) pfmyg = fopen(chMyGates, "wb");
+		pft = fopen("t5.csv", "wb");
+		pftbin = fopen("t5.bin", "wb");
+		pfi = fopen("runways.xml", "wb");
 	
-			if (pf || pf2 || pfi)
+		if (pf || pf2 || pfi)
 			{	static char *pszILSflags[] = {	"", "B", "G", "BG", "D", "BD", "DG", "BDG" };
 				DWORD dwCurrentICAO = 0;
 					
@@ -1258,15 +1318,13 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 									StringXML(chWk, p->pStateName));
 							fprintf(pfi, "<City>%s</City>\x0d\x0a",
 								StringXML(chWk, p->pCityName ? p->pCityName : ""));
-#ifdef ADDFILEDETAILS
 							fprintf(pfi, "<File>%s</File>\x0d\x0a",
 								StringXML(chWk, p->pPathName ? p->pPathName : ""));
 							fprintf(pfi, "<SceneryName>%s</SceneryName>\x0d\x0a",
 								StringXML(chWk, p->pSceneryName ? p->pSceneryName : "" ));
-#endif
 							fprintf(pfi, "<Longitude>%.6f</Longitude>\x0d\x0a<Latitude>%.6f</Latitude>\x0d\x0a",
 									(double) p->r.fLong, (double) p->r.fLat);
-							fprintf(pfi, "<Altitude>%.2f</Altitude>\x0d\x0a<MagVar>%.3f<%/MagVar>\x0d\x0a",
+							fprintf(pfi, "<Altitude>%.2f</Altitude>\x0d\x0a<MagVar>%.3f</MagVar>\x0d\x0a",
 									(p->r.fAlt +0.005), (double) p->fMagvar);
 						}
 					}
@@ -1385,7 +1443,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 									(p->r.bAppLights & 0x20) ? "TRUE" : "FALSE");
 								fprintf(pfi, "<Strobes>%d</Strobes>\x0d\x0a", p->r.nStrobes);
 								fprintf(pfi, "<LeftVASI>%s</LeftVASI>\x0d\x0a", pszVASI[p->r.bVASIleft & 0x0f]);
-#ifdef ADDMOREVASI
 								if (p->r.bVASIleft & 0x0f)
 								{	fprintf(pfi, "<LeftVASIbiasX>%.2f</LeftVASIbiasX>\x0d\x0a",
 										p->r.fLeftBiasX + 0.005);
@@ -1396,10 +1453,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 									fprintf(pfi, "<LeftVASIpitch>%.2f</LeftVASIpitch>\x0d\x0a",
 										p->r.fLeftPitch + 0.005);
 								}
-#endif
 
 								fprintf(pfi, "<RightVASI>%s</RightVASI>\x0d\x0a", pszVASI[p->r.bVASIright & 0x0f]);
-#ifdef ADDMOREVASI
+
 								if (p->r.bVASIright & 0x0f)
 								{	fprintf(pfi, "<RightVASIbiasX>%.2f</RightVASIbiasX>\x0d\x0a",
 										p->r.fRightBiasX + 0.005);
@@ -1410,7 +1466,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 									fprintf(pfi, "<RightVASIpitch>%.2f</RightVASIpitch>\x0d\x0a",
 										p->r.fRightPitch + 0.005);
 								}
-#endif
 
 								fprintf(pfi, "<ThresholdOffset>%d</ThresholdOffset>\x0d\x0a",
 									p->nOffThresh);
@@ -1474,7 +1529,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 									while (b-- && isprint(*pA))
 									{	fprintf(pfg, ",%.4s", pA);
 
-										if (nMatchMyAirline && (strnicmp(pA, chMyAirLine, nMatchMyAirline) == 0))
+										if (nMatchMyAirline && (_strnicmp(pA, chMyAirLine, nMatchMyAirline) == 0))
 											fMyAirlineGate = TRUE;
 
 										pA += 4;
@@ -1576,7 +1631,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				}
 				fOk |= 2;
 			}
-		#endif
 
 		while (pR)
 		{	RWYLIST *pLast = pR;
@@ -1596,27 +1650,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	PostMessage(hWnd, WM_USER, 0, fOk);
 	if (fQuiet) SendMessage(hWnd, WM_CLOSE, 0, 0);
 	return 0;
-
-	// Exception Handler
-	}
-	__except(	ExRec = *(GetExceptionInformation())->ExceptionRecord,
-				CxRec = *(GetExceptionInformation())->ContextRecord,
-				EXCEPTION_EXECUTE_HANDLER)
-	{	fprintf(fpAFDS, "\n\n***ERROR %08X at %08X (errnum=%d comms=%d):\n",
-					ExRec.ExceptionCode, ExRec.ExceptionAddress,
-					errnum, nComms);
-		if (ExRec.ExceptionCode == EXCEPTION_ACCESS_VIOLATION)
-			fprintf(fpAFDS, "***      Access violation trying to %s address %08X\n",
-				ExRec.ExceptionInformation[0] ? "write" : "read", ExRec.ExceptionInformation[1]);
-		if (CxRec.ContextFlags & CONTEXT_INTEGER)
-			fprintf(fpAFDS, "***      EAX %08X  EBX %08X  ECX %08X  EDX %08X  EDI %08X  ESI %08X\n",
-				CxRec.Eax, CxRec.Ebx, CxRec.Ecx, CxRec.Edx, CxRec.Edi, CxRec.Esi);
-	}
-
-	fclose(fpAFDS);
-	PostMessage(hWnd, WM_CLOSE, 0, 0);
-	return -1;
 }
+
 
 /******************************************************************************
          DlgProc
@@ -1650,7 +1685,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 					SetWindowText(GetDlgItem(hWnd, IDC_PRESS),"OK");
 					if (!fQuiet) MessageBeep(MB_ICONEXCLAMATION);
 					// Drop through ...
-
+	
 				case 1: //Airports or runways
 				case 2:
 					sprintf(wk, "Total airports = %d, runways = %d", ulTotalAPs, ulTotalRwys);
@@ -1713,69 +1748,93 @@ long CALLBACK NullWndProc(HWND hwnd, UINT message, UINT wParam, LONG lParam)
 }
 
 int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
-      LPSTR lpszCmdLine, int nCmdShow)
-{  	char *pch = &lpszCmdLine[0];
+	LPSTR lpszCmdLine, int nCmdShow)
+{
+	char* pch = &lpszCmdLine[0];
 	MSG msg;
 	DWORD dwId;
 
 	hInstance = hInst;
 
-	#ifdef _DEBUG
-		MessageBox(NULL, "Press OK when ready ...", "MakeRunways Debugging", MB_OK);
-	#endif
+#ifdef _DEBUG
+	MessageBox(NULL, "Press OK when ready ...", "MakeRunways Debugging", MB_OK);
+#endif
 
-	pch = strchr(pch,'/');
+	pch = strchr(pch, '/');
 
 	while (pch && *pch)
-	{	if (strnicmp(&pch[1], "WATER", 5) == 0)
-		{	fIncludeWater = TRUE;
+
+	{
+		if (_strnicmp(&pch[1], "WATER", 5) == 0)
+
+		{
+			fIncludeWater = TRUE;
 			pch += 6;
-			if (strnicmp(&pch[0], "ONLY", 4) == 0)
-			{	fIncludeWater = -1;
+			if (_strnicmp(&pch[0], "ONLY", 4) == 0)
+			{
+				fIncludeWater = -1;
 				pch += 4;
 			}
 		}
 
-		else if (strnicmp(&pch[1], "JET", 3) == 0)
-		{	fMarkJetways = TRUE;
+		else if (_strnicmp(&pch[1], "JET", 3) == 0)
+
+		{
+			fMarkJetways = TRUE;
 			pch += 4;
 		}
 
-		else if (strnicmp(&pch[1], "SSNG", 5) == 0)
-		{	fNoLoadLorby = TRUE;
+		else if (_strnicmp(&pch[1], "SSNG", 5) == 0)
+
+		{
+			fNoLoadLorby = TRUE;
 			pch += 5;
 		}
 
-		else if (strnicmp(&pch[1], "OLDNODRAW", 5) == 0)
-		{	fNoDrawHoldConvert = FALSE;
+		else if (_strnicmp(&pch[1], "OLDNODRAW", 5) == 0)
+
+		{
+			fNoDrawHoldConvert = FALSE;
 			pch += 10;
 		}
 
 		else if (pch[1] == '>')
-		{	pch += 2;
+
+		{
+			pch += 2;
 			nMinRunwayLen = atoi(pch);
 		}
 
 		else if ((pch[1] == '+') && (toupper(pch[2]) == 'D'))
-		{	fDebug = TRUE;
+
+		{
+			fDebug = TRUE;
 			pch += 3;
 		}
 
 		else if ((pch[1] == '+') && (toupper(pch[2]) == 'T'))
-		{	fProcessTA = TRUE;
+
+		{
+			fProcessTA = TRUE;
 			pch += 3;
 		}
 
 		else if ((pch[1] == '+') && (toupper(pch[2]) == 'Q'))
-		{	fQuiet = TRUE;
+
+		{
+			fQuiet = TRUE;
 			pch += 3;
 		}
 
 		else
-		{	pch++;
+
+		{
+			pch++;
 			nMatchMyAirline = strlen(pch);
-			if (nMatchMyAirline > 4) 
-			{	nMatchMyAirline = 4;
+			if (nMatchMyAirline > 4)
+
+			{
+				nMatchMyAirline = 4;
 				pch[4] = 0;
 			}
 
@@ -1784,7 +1843,7 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 			break;
 		}
 
-		pch = strchr(pch,'/');
+		pch = strchr(pch, '/');
 	}
 
 	GetModuleFileName(hInstance, szMyPath, MAX_PATH);
@@ -1795,7 +1854,8 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 	strcat(szMyPath, "scenery.cfg");
 
 	if (fQuiet)
-	{	WNDCLASS Class;
+	{
+		WNDCLASS Class;
 		char szAppName[] = "MakeRunways";
 		// Register the class for our Window
 		memset(&Class, 0, sizeof(WNDCLASS));
@@ -1808,9 +1868,10 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 		RegisterClass(&Class);
 
 		hWnd = CreateWindow(szAppName, szAppName, 0, CW_USEDEFAULT, CW_USEDEFAULT,
-					0, 0, NULL, NULL, hInstance, NULL);
+			0, 0, NULL, NULL, hInstance, NULL);
 		if (!hWnd)
-		{	DWORD dwErr = GetLastError();
+		{
+			DWORD dwErr = GetLastError();
 			DebugBreak();
 		}
 		ShowWindow(hWnd, SW_HIDE);
@@ -1818,15 +1879,17 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 	else
 		hWnd = CreateDialog(hInstance, "MyDlg", 0, DlgProc);
 
-	CreateThread(NULL, 0, MainRoutine, NULL, 0, &dwId);				
+	CreateThread(NULL, 0, MainRoutine, NULL, 0, &dwId);
 
 	while (GetMessage(&msg, NULL, 0, 0))
-	{	if (!IsDialogMessage(hWnd, (LPMSG) &msg))
-		{	TranslateMessage(&msg);
+	{
+		if (!IsDialogMessage(hWnd, (LPMSG)&msg))
+		{
+			TranslateMessage(&msg);
 			DispatchMessage(&msg);
 		}
 	}
-	
+
 	return 0;
 }
 

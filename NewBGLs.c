@@ -211,7 +211,6 @@ void DoHelipadOnly(helipad_t* ph, char *pszICAO)
 		phs->sLen, phs->sWidth, (double) ph->fHeading);
 }
 
-#ifdef RWSLIST
 /******************************************************************************
          PrintRWSLIST
 ******************************************************************************/
@@ -236,7 +235,6 @@ void PrintRWSLIST(RWYLIST *pL)
 				(pL->fILSflags & 0x04) ? " BC" : "");
 	}
 }
-#endif					
 
 /******************************************************************************
          ProcessRunwayList
@@ -252,9 +250,7 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 	// First, standardise chICAO 4 chars: ###4692
 	if (pL->r.chICAO[3] == ' ') pL->r.chICAO[3] = 0;
 
-	#ifdef RWSLIST
-		if ((fAdd > 0) && !pL->fAirport && !pL->pGateList && !pL->pTaxiwayList) PrintRWSLIST(pL);
-	#endif
+	if ((fAdd > 0) && !pL->fAirport && !pL->pGateList && !pL->pTaxiwayList) PrintRWSLIST(pL);
 
 	if (fDebugThisEntry)
 	{	if (strncmp(pL->r.chRwy, "999", 3) == 0)
@@ -324,10 +320,8 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 						pRlast->pTaxiwayList = pL->pTaxiwayList;
 					pRlast->fILSflags = pL->fILSflags;
 
-#ifdef ADDFILEDETAILS
 					pRlast->pPathName = pL->pPathName;
 					pRlast->pSceneryName = pL->pSceneryName;
-#endif
 					if (strncmp(pL->r.chRwy, "999", 3) == 0)
 						prwyPrevious = pRlast;
 					free(pL);
@@ -354,13 +348,11 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 				pRlast->pGateList = 0;
 				pRlast->pTaxiwayList = 0;
 
-				#ifdef RWSLIST
-					if (!pRlast->fAirport)
-					{	PrintRWSLIST(pRlast);
-						fprintf(fpAFDS, "\n");
-					}
-				#endif					
-
+				if (!pRlast->fAirport)
+				{	PrintRWSLIST(pRlast);
+					fprintf(fpAFDS, "\n");
+				}
+				
 				fDir = 1;
 
 				pRlast = pRlast->pTo;
@@ -761,21 +753,17 @@ BOOL FindVASI(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 			nThisLen = ps->nLen;
 			if (nType & 1)
 			{	prwy->r.bVASIleft = (BYTE) ps->wType;
-#ifdef ADDMOREVASI
 				prwy->r.fLeftBiasX = ps->fBiasX;
 				prwy->r.fLeftBiasZ = ps->fBiasZ;
 				prwy->r.fLeftSpacing = ps->fSpacing;
 				prwy->r.fLeftPitch = ps->fPitch;
-#endif
 			}
 			else
 			{	prwy->r.bVASIright = (BYTE) ps->wType;
-#ifdef ADDMOREVASI
 				prwy->r.fRightBiasX = ps->fBiasX;
 				prwy->r.fRightBiasZ = ps->fBiasZ;
 				prwy->r.fRightSpacing = ps->fSpacing;
 				prwy->r.fRightPitch = ps->fPitch;
-#endif
 			}
 			return TRUE;
 		}
@@ -2035,10 +2023,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				ap.pStateName = pStaName;
 				ap.pCountryName = pCtyName;
 				ap.pAirportName = pApName;
-#ifdef ADDFILEDETAILS
 				ap.pPathName = pPathName;
 				ap.pSceneryName = pSceneryName;
-#endif
 			}
 		}
 
