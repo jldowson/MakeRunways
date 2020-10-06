@@ -976,18 +976,71 @@ void ScanSceneryArea(char *pszPath)
 }
 
 /******************************************************************************
+		 Data for scenery layer list
+******************************************************************************/
+
+int nAreas[10000]; // Priorities 1-9999
+char szTitles[10000][64];
+char szPaths[10000][MAX_PATH];
+BYTE bActive[10000];
+int nArea = 0;
+
+char szAsoboPaths[1000][MAX_PATH];
+int nAsobo = 0;
+
+/******************************************************************************
 		 ProcessMSFSCommunity
 ******************************************************************************/
 
 ProcessMSFSCommunity(char* pPath)
-{
+{	char szPath[MAX_PATH];
+	HANDLE hFind;
+	HANDLE hFile;
+	WIN32_FIND_DATA fd;
+
+	strcpy(szPath, pPath);
+	strcat(szPath, "*.BGL");
+
+	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
+	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+	{	// found a scenery layer - add it to the list ...
+//#ifdef _DEBUG
+//		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
+//			fprintf(fpAFDS, "ENCRYPTED=");
+//		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
+//endif
+		strcpy(szPaths[nArea++], pPath);
+	}
+
+	FindClose(hFind);
+	hFind = INVALID_HANDLE_VALUE;
+
+	strcpy(szPath, pPath);
+	strcat(szPath, "*.*");
+
+	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
+	while (hFind != INVALID_HANDLE_VALUE)
+	{	// Check for directory
+		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+			strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, ".."))
+		{	strcpy(szPath, pPath);
+			strcat(szPath, fd.cFileName);
+			strcat(szPath, "\\");
+			ProcessMSFSCommunity(szPath);
+		}
+
+		if (!FindNextFile(hFind, (WIN32_FIND_DATA*)&fd))
+		{	FindClose(hFind);
+			hFind = INVALID_HANDLE_VALUE;
+		}
+	}
 }
 
 /******************************************************************************
 		 ProcessMSFSOfficial
 ******************************************************************************/
 
-ProcessMSFSOfficial(char* pPath)
+ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 {	char szPath[MAX_PATH];
 	HANDLE hFind;
 	HANDLE hFile;
@@ -999,9 +1052,15 @@ ProcessMSFSOfficial(char* pPath)
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 	{	// found a scenery layer - add it to the list ...
-		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
-			fprintf(fpAFDS, "ENCRYPTED=");
-		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
+//#ifdef _DEBUG
+//		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
+//			fprintf(fpAFDS, "ENCRYPTED=");
+//		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
+//#endif
+		if (fAsobo)
+			strcpy(szAsoboPaths[nAsobo++], pPath);
+		else 
+			strcpy(szPaths[nArea++], pPath);
 	}
 
 	FindClose(hFind);
@@ -1019,7 +1078,7 @@ ProcessMSFSOfficial(char* pPath)
 		{	strcpy(szPath, pPath);
 			strcat(szPath, fd.cFileName);
 			strcat(szPath, "\\");
-			ProcessMSFSOfficial(szPath);
+			ProcessMSFSOfficial(szPath, strstr(szPath, "asobo-airport"));
 		}
 	
 		if (!FindNextFile(hFind, (WIN32_FIND_DATA*) &fd))
@@ -1050,13 +1109,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 {	char szArea[512], szParam[64];
 	char szCfgPath[MAX_PATH + 128];
 	BOOL fOk = 0, fFSX = -1;
-	int nArea = 0;
-
-	static int nAreas[10000]; // Priorities 1-9999
-	static char szTitles[10000][64];
-	static char szPaths[10000][MAX_PATH];
-	static BYTE bActive[10000];
-
+	
 	memset(&nAreas[0], 0xff, sizeof(nAreas));
 	memset(&bActive[0], 0, sizeof(bActive));
 
@@ -1121,13 +1174,45 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		strcat(szCfgPath, "Official\\OneStore\\");
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS official scenery in: \n  \x22%s\x22\n", szCfgPath);
-			ProcessMSFSOfficial(szCfgPath);
+			ProcessMSFSOfficial(szCfgPath, FALSE);
+			// Add the asobo-airport entries to the end of the main list
+			int i = 0;
+			while (i < nAsobo)
+				strcpy(szPaths[nArea++], szAsoboPaths[i++]);
 		}
 		
-		strcpy(&szCfgPath[fsPathLen], "Community");
+		strcpy(&szCfgPath[fsPathLen], "Community\\");
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS community scenery in: \n  \x22%s\x22\n", szCfgPath);
 			ProcessMSFSCommunity(szCfgPath);
+		}
+
+#ifdef _DEBUG
+		fprintf(fpAFDS, "\n****************************************************");
+		fprintf(fpAFDS, "\n  TABLES RESULTING:\n\n");
+#endif
+			// complete the tables (with fiction at present)
+		int i = 0;
+		while (i < nArea)
+		{	nAreas[i] = i + 1;
+			bActive[i] = 0xff;
+			int j = strlen(szPaths[i]);
+			szPaths[i][--j] = 0; // Dispense with last backslash
+			char* psz = strstr(szPaths[i], "OneStore");
+			if (!psz) psz = strstr(szPaths[i], "Community");
+			if (psz)
+			{
+				strcpy(szTitles[i], psz);
+				while (psz = strchr(szTitles[i], '\\'))
+					*psz = ' ';
+			}
+
+#ifdef _DEBUG
+			fprintf(fpAFDS, "========= Area %d ==========\n", i + 1);
+			fprintf(fpAFDS, "TITLE=\x22%s\x22\n", szTitles[i]); 
+			fprintf(fpAFDS, "%s\n\n", szPaths[i]);
+#endif
+			i++;
 		}
 
 		goto FINISHOFF;
@@ -1156,6 +1241,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		nArea++;
 	}
 	
+FINISHOFF:
 	nArea = 0;
 	while (nArea < 10000)
 	{	if (fUserAbort) return 0;
@@ -1198,7 +1284,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		nArea++;
 	}
 
-FINISHOFF:
 	fprintf(fpAFDS, "\n");
 	fprintf(fpAFDS, chLine);
 
