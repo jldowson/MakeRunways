@@ -20,7 +20,7 @@ typedef struct _NBGLHDR
 	WORD size;				//  4 0x0038
 	WORD wResvd1;			//  6 reserved (0x0000)
 	BYTE szCrc[6];			//  8 48-bits CRC or what ???
-	BYTE szUnk1[2];			// 14 always 0xC301 .............C6 01 in FSX
+	BYTE szUnk1[2];			// 14 always 0xC301 .............C6 01 in FSX (D6 01 in MSFS)
 	int nMagic;				// 16 magic number ? - 13451555 ... 134551555
 	DWORD nObjects;			// 20 number of object groups within file
 	int nLatMax;			// 24 latitude max ???
@@ -41,6 +41,7 @@ typedef struct _NOBJ
 } NOBJ;
 
 // Objects IDs
+#define OBJTYPE_AIRPORT_MSFS 0x0056
 #define OBJTYPE_AIRPORT		0x0003
 #define OBJTYPE_RUNWAY		0x0004
 #define OBJTYPE_START		0x0011

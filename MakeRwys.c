@@ -5,6 +5,7 @@
 #include "shfolder.h"
 #include <winver.h>
 
+BOOL fMSFS = FALSE;
 int errnum = 0;
 int nMatchMyAirline = 0;
 char chMyAirLine[5];
@@ -906,13 +907,15 @@ void ScanSceneryArea(char *pszPath)
 	fpos = strlen(szParam);
 	if (fDeletionsPass > 0) fprintf(fpAFDS, "Path(Local/Remote)=%s\n", szParam);
 
-	strcat(szParam, "\\scenery");
-	if ((GetFileAttributes(szParam) != FILE_ATTRIBUTE_DIRECTORY) && (fpos > 8) &&
-			(_strnicmp(&szParam[fpos-8], "\\scenery", 8) == 0))
-		// Scenery path is complete already!
-		szParam[fpos] = 0;
-	else
-		fpos += 8;
+	if (!fMSFS)
+	{	strcat(szParam, "\\scenery");
+		if ((GetFileAttributes(szParam) != FILE_ATTRIBUTE_DIRECTORY) && (fpos > 8) &&
+			(_strnicmp(&szParam[fpos - 8], "\\scenery", 8) == 0))
+			// Scenery path is complete already!
+			szParam[fpos] = 0;
+		else
+			fpos += 8;
+	}
 
 	strcat(szParam, "\\*.bgl");
 	fpos++;
@@ -963,9 +966,9 @@ void ScanSceneryArea(char *pszPath)
 						if (fDebug) CheckTables(szParam);
 					}
 				}
+				
+				fclose(fpIn);
 			}
-
-			fclose(fpIn);
 		}
 	
 		if (!FindNextFile(hFind, (WIN32_FIND_DATA *) &find))
@@ -1215,7 +1218,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			i++;
 		}
 
-		goto FINISHOFF;
+		fMSFS = TRUE;
+		goto MAINLOOPS;
 	}
 
 	fprintf(fpAFDS, "Reading %s scenery:\n", pszSimName[fFSX+1]);	
@@ -1241,7 +1245,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		nArea++;
 	}
 	
-FINISHOFF:
+MAINLOOPS:
 	nArea = 0;
 	while (nArea < 10000)
 	{	if (fUserAbort) return 0;

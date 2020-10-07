@@ -305,6 +305,7 @@ typedef struct
 	// 28
 } HELI;
 
+extern BOOL fMSFS;
 extern HELI helipads[10000];
 extern int nHelipadCtr;
 extern BOOL fDebug;

@@ -1905,7 +1905,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		//******************************************/
 
 		if ((pa->wId == OBJTYPE_AIRPORT) || (pa->wId == OBJTYPE_NEWAIRPORT) ||
-				(pa->wId == OBJTYPE_NEWNEWAIRPORT))
+				(pa->wId == OBJTYPE_NEWNEWAIRPORT) || (pa->wId == OBJTYPE_AIRPORT_MSFS))
 		{	// Airport record found
 			if (!fDeletionsPass && ap.fAirport)
 			{	if (nCommStart || nCommDelStart)

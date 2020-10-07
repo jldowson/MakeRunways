@@ -28,6 +28,7 @@ typedef struct _tag_objs
 } NOBJ;
 
 // Objects IDs
+#define OBJTYPE_AIRPORT_MSFS 0x0056
 #define OBJTYPE_AIRPORT		0x0003
 #define OBJTYPE_RUNWAY		0x0004
 #define OBJTYPE_VOR			0x0013
