@@ -2855,6 +2855,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 		size -= nThisLen;
 		pa =  (NAPT *) ((BYTE *) pa + nThisLen);
+		if (nThisLen == 0)
+		{	fprintf(fpAFDS, "#### Error: record length == 0\n");
+			break;
+		}
 	}
 
 	if (ap.fAirport)

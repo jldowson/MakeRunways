@@ -6,6 +6,13 @@
 #include <winver.h>
 
 BOOL fMSFS = FALSE;
+
+#ifdef _DEBUG
+	BOOL fDoMSFS = TRUE;
+#else
+	BOOL fDoMSFS = FALSE;
+#endif
+
 int errnum = 0;
 int nMatchMyAirline = 0;
 char chMyAirLine[5];
@@ -939,7 +946,8 @@ void ScanSceneryArea(char *pszPath)
 
 			if (fpIn)
 			{	BOOL fDone = FALSE;
-
+if (strstr(szParam, "APX04100"))
+	DebugBreak();
 				// See if file contains AFDs:
 				if ((fFS9 >= 0) && (fread(&nbglhdr, 1, sizeof(NBGLHDR), fpIn) >= 
 							(sizeof(NBGLHDR) - ((NSECTS_PER_FILE - 1) * sizeof(NSECTS)))))
@@ -1123,7 +1131,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 4.91 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 4.92 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1169,12 +1177,21 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
 	}
 
-	if (fFSX < 0)
-	{	// See if it is MSFS
+	if ((fFSX < 0) && fDoMSFS)
+	{	// See if it is MSFS, in MS Store location
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
 		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
-			int fsPathLen = strlen(szCfgPath);
+		int fsPathLen = strlen(szCfgPath);
 		strcat(szCfgPath, "Official\\OneStore\\");
+		
+		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
+		{	// Not MS Store, try Steam version:
+			strcpy(szCfgPath, getenv("APPDATA"));
+			strcat(szCfgPath, "\\Microsoft Flight Simulator\\Packages\\");
+			fsPathLen = strlen(szCfgPath);
+			strcat(szCfgPath, "Official\\OneStore\\");
+		}
+		
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS official scenery in: \n  \x22%s\x22\n", szCfgPath);
 			ProcessMSFSOfficial(szCfgPath, FALSE);
@@ -1754,7 +1771,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 4.91");
+			SetWindowText(hDlg, "Make Runways: Version 4.92");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -1852,12 +1869,13 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 	pch = strchr(pch, '/');
 
 	while (pch && *pch)
+	{	if (_strnicmp(&pch[1], "MSFS", 4) == 0)
+		{	fDoMSFS = TRUE;
+			pch += 5;
+		}
 
-	{
 		if (_strnicmp(&pch[1], "WATER", 5) == 0)
-
-		{
-			fIncludeWater = TRUE;
+		{	fIncludeWater = TRUE;
 			pch += 6;
 			if (_strnicmp(&pch[0], "ONLY", 4) == 0)
 			{
@@ -1867,16 +1885,12 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 		}
 
 		else if (_strnicmp(&pch[1], "JET", 3) == 0)
-
-		{
-			fMarkJetways = TRUE;
+		{	fMarkJetways = TRUE;
 			pch += 4;
 		}
 
 		else if (_strnicmp(&pch[1], "SSNG", 5) == 0)
-
-		{
-			fNoLoadLorby = TRUE;
+		{	fNoLoadLorby = TRUE;
 			pch += 5;
 		}
 
