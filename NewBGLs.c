@@ -841,7 +841,9 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 	if (pLastSetGateList)
 	{	wGateCtr = (WORD) (*pLastSetGateList & 0xffff);
 		ppg = (NGATE **) &pLastSetGateList[1];
-		ppg2 = (NGATE2 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWTAXIPARK) ? ppg : 0);
+		ppg2 = (NGATE2 **) (
+			(((*pLastSetGateList >> 16) == OBJTYPE_NEWTAXIPARK) ||
+				((*pLastSetGateList >> 16) == OBJTYPE_MSFSTAXIPARK)) ? ppg : 0); // ############### MSFSTAXIPARK ?? #########
 	}
 
 	if (!twh)
@@ -1087,6 +1089,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	{	wGateCtr = (WORD) (*pLastSetGateList & 0xffff);
 		ppg = (NGATE **) &pLastSetGateList[1];
 		ppg3 = (NGATE3 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWNEWTAXIPARK) ? ppg : 0);
+		// ############### MSFSTAXIPARK ?? #########
 	}
 
 	if (!twh)
@@ -1332,6 +1335,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 	{	wGateCtr = (WORD) (*pLastSetGateList & 0xffff);
 		ppg = (NGATE **) &pLastSetGateList[1];
 		ppg2 = (NGATE2 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWTAXIPARK) ? ppg : 0);
+		// ############### MSFSTAXIPARK ?? #########
 	}
 
 	if (!twh)
@@ -1579,6 +1583,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 		ppg = (NGATE **) &pLastSetGateList[1];
 		ppg2 = (NGATE2 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWTAXIPARK) ? ppg : 0);
 		ppg3 = (NGATE3 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWNEWTAXIPARK) ? ppg : 0);
+		// ############### MSFSTAXIPARK ?? #########
 	}
 
 	if (!twh)
@@ -1925,6 +1930,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			nThisLen = sizeof(NAPT);
 			if (pa->wId == OBJTYPE_AIRPORT) nThisLen -= 4;
 			else if (pa->wId == OBJTYPE_NEWNEWAIRPORT) nThisLen += 4;
+			else if (pa->wId == OBJTYPE_AIRPORT_MSFS) nThisLen += 12;
 
 			if (!fDeletionsPass)
 			{
@@ -2142,7 +2148,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		} 
 
 		else if (!fDeletionsPass && id &&
-				((pa->wId == OBJTYPE_RUNWAY) || (pa->wId == OBJTYPE_NEWRUNWAY)))
+				((pa->wId == OBJTYPE_RUNWAY) || (pa->wId == OBJTYPE_NEWRUNWAY)
+					|| (pa->wId == OBJTYPE_MSFSRUNWAY)))
 		{	// Runway record found
 			NRWY *pr = (NRWY *) pa;
 			int nFreq, fOk = 0, fList = 0;
@@ -2544,7 +2551,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			}
 		}
 
-		else if (!fDeletionsPass && id && (pa->wId == OBJTYPE_JETWAY) &&
+		else if (!fDeletionsPass && id &&
+			((pa->wId == OBJTYPE_JETWAY) || (pa->wId == OBJTYPE_MSFSJETWAY)) &&
 				fMarkJetways &&	pLastSetGateList && prwyPrevious)
 		{	// Jetway record found
 			NJETWAY *pjw = (NJETWAY *) pa;
@@ -2556,6 +2564,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NGATE *pg = (NGATE *) ((BYTE *) pgh + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
+			// ############### MSFSTAXIPARK ?? #########
 
 			fprintf(fpAFDS, "          Gate %d has Jetway\n", nGateNum);
 			if (fDebugThisEntry)
@@ -2582,13 +2591,15 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		}
 		
 		else if (!fDeletionsPass && id && ((pa->wId == OBJTYPE_TAXIPARK) || (pa->wId == OBJTYPE_NEWTAXIPARK)
-				|| (pa->wId == OBJTYPE_NEWNEWTAXIPARK)))
+				|| (pa->wId == OBJTYPE_NEWNEWTAXIPARK)
+				|| (pa->wId == OBJTYPE_MSFSTAXIPARK))) // ############### MSFSTAXIPARK ?? #########
 		{	// Gate record found
 			NGATEHDR *pgh = (NGATEHDR *) pa;
 			WORD w = 0, wCtr = pgh->wCount;
 			NGATE *pg = (NGATE *) ((BYTE *) pa + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pa->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pa->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
+			// ################ MSFSTAXIPARK?? ####################
 
 			nThisLen = pgh->nLen;
 
@@ -2663,7 +2674,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		}
 		
 		else if (!fDeletionsPass && id && ((pa->wId == OBJTYPE_TAXIPATH) ||
-				(pa->wId == OBJTYPE_NEWTAXIPATH) || (pa->wId == OBJTYPE_NEWNEWTAXIPATH)))
+				(pa->wId == OBJTYPE_NEWTAXIPATH) || (pa->wId == OBJTYPE_NEWNEWTAXIPATH)
+					|| (pa->wId == OBJTYPE_MSFSTAXIPATH)))
 		{	// Taxi path record found
 			NTAXIHDR *pth = (NTAXIHDR *) pa;
 			WORD w = 0;
@@ -2695,7 +2707,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				}
 			}
 
-			else if (pa->wId == OBJTYPE_NEWTAXIPATH)
+			else if ((pa->wId == OBJTYPE_NEWTAXIPATH) || (pa->wId == OBJTYPE_MSFSTAXIPATH)) // ############# MSFSTAXIPATH? ##########
 			{	pNTpath = (NEWNTAXI *) ((BYTE *) pa + sizeof(NTAXIHDR));
 				fNewTaxiPath = TRUE;
 				wTpath = pth->wCount;		

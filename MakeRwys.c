@@ -946,8 +946,7 @@ void ScanSceneryArea(char *pszPath)
 
 			if (fpIn)
 			{	BOOL fDone = FALSE;
-if (strstr(szParam, "APX04100"))
-	DebugBreak();
+
 				// See if file contains AFDs:
 				if ((fFS9 >= 0) && (fread(&nbglhdr, 1, sizeof(NBGLHDR), fpIn) >= 
 							(sizeof(NBGLHDR) - ((NSECTS_PER_FILE - 1) * sizeof(NSECTS)))))
@@ -1015,11 +1014,6 @@ ProcessMSFSCommunity(char* pPath)
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 	{	// found a scenery layer - add it to the list ...
-//#ifdef _DEBUG
-//		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
-//			fprintf(fpAFDS, "ENCRYPTED=");
-//		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
-//endif
 		strcpy(szPaths[nArea++], pPath);
 	}
 
@@ -1063,11 +1057,6 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 	{	// found a scenery layer - add it to the list ...
-//#ifdef _DEBUG
-//		if (fd.dwFileAttributes & FILE_ATTRIBUTE_ENCRYPTED)
-//			fprintf(fpAFDS, "ENCRYPTED=");
-//		fprintf(fpAFDS, "\x22%s\x22\n", pPath);
-//#endif
 		if (fAsobo)
 			strcpy(szAsoboPaths[nAsobo++], pPath);
 		else 
@@ -1207,11 +1196,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			ProcessMSFSCommunity(szCfgPath);
 		}
 
-#ifdef _DEBUG
-		fprintf(fpAFDS, "\n****************************************************");
-		fprintf(fpAFDS, "\n  TABLES RESULTING:\n\n");
-#endif
-			// complete the tables (with fiction at present)
+		// complete the tables (with fiction at present)
 		int i = 0;
 		while (i < nArea)
 		{	nAreas[i] = i + 1;
@@ -1227,11 +1212,6 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 					*psz = ' ';
 			}
 
-#ifdef _DEBUG
-			fprintf(fpAFDS, "========= Area %d ==========\n", i + 1);
-			fprintf(fpAFDS, "TITLE=\x22%s\x22\n", szTitles[i]); 
-			fprintf(fpAFDS, "%s\n\n", szPaths[i]);
-#endif
 			i++;
 		}
 
