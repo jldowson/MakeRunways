@@ -76,12 +76,13 @@ typedef struct _NOBJ
 #define	OBJTYPE_NEWNEWAIRPORT	0x00AB
 #define	OBJTYPE_NEWTAXIPARK	0x003D
 #define	OBJTYPE_NEWNEWTAXIPARK	0x00AD
-#define	OBJTYPE_MSFSTAXIPARK	0x00AD
+#define	OBJTYPE_MSFSTAXIPARK	0x00E7
 #define	OBJTYPE_NEWRUNWAY	0x003E
 #define OBJTYPE_NEWTAXIPATH	0x0040
 #define OBJTYPE_NEWNEWTAXIPATH	0x00AE
 #define OBJTYPE_MSFSTAXIPATH	0x00D4
 #define	OBJTYPE_MSFSRUNWAY	0x00CE
+#define OBJTYPE_MSFSRUNWAY_LEN sizeof(NRWY) //0x34
 #define MAXSOUTH 536870912
 #define MAXEAST 805306368
 
@@ -406,6 +407,24 @@ typedef struct _NEWNTAXI2
 	int nflatten;
 	// ACCORDING TO Jon: int nsurfaceQuery;
 } NEWNTAXI2;
+
+typedef struct _MSFSNTAXI
+{	WORD wStart;			// 0000 - start index
+	WORD wOldEnd;			// 0002 - not now end index
+							//        high part of the high byte also
+							//        stores runway designator in bits12-15
+	BYTE bDrawFlags;		// 0004 - combination of draw flags and path types,
+							//        see constant above
+	BYTE bNumber;			// 0005 - runway number
+	BYTE bCenterFlags;		// 0006 - centerline flags, see constants above
+	BYTE bOldSurface;		// 0007 - was runway surface, now GUID below
+	float fWidth;			// 0008 - width in meters
+	int nWeightLimit;		// 0012 - weigth limit
+	BYTE bUnk1[8];			// 0016 - extra bytes unknown use
+	BYTE guidSurface[16];	// 0024 - GUID for surface material
+	BYTE bUnk2[6];			// 0040 - unknown
+	WORD wEnd;				// 0046 - end index
+} MSFSNTAXI;
 
 // taxiway point entry structure
 #define TWP_NORMAL			0x00000001

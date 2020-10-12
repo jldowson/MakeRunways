@@ -1582,6 +1582,7 @@ MAINLOOPS:
 							NGATE *pg = (NGATE *) ((BYTE *) p->pGateList + sizeof(NGATEHDR));
 							NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 							NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
+							if (pgh->wId == OBJTYPE_MSFSTAXIPARK) pg2 = pg;
 
 							while (w < wCtr)
 							{	LOCATION locg;
@@ -1598,6 +1599,9 @@ MAINLOOPS:
 									chLetter[1] = 0;
 									pszLetter = &chLetter[0];
 								}
+
+								if (fDebug && (pg->bCodeCount & 0x7F))
+									fprintf(fpAFDS, "### Airline Code Count = %d\n", pg->bCodeCount & 0x7f);
 								
 								SetLocPos(&locg, 0,
 									pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
@@ -1645,6 +1649,8 @@ MAINLOOPS:
 								w++;
 								pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) +
 										(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
+								if (pgh->wId == OBJTYPE_MSFSTAXIPARK)
+									pg = (NGATE*)((BYTE*)pg + 20); // 20 additional bytes
 								if (pg2) pg2 = (NGATE2 *) pg;
 								if (pg3) pg3 = (NGATE3 *) pg;
 							}

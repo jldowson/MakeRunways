@@ -1,6 +1,6 @@
 /* NewBGLs.c
 *******************************************************************************/
-//#define DEBUG_THIS_ICAO "PHNL"
+#define DEBUG_THIS_ICAO "EGLC"
 
 #include "MakeRwys.h"
 
@@ -644,7 +644,7 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 
 		if (fUserAbort) return 0;
 		
-		/**************************************************
+		//**************************************************
 		if (fDebug)	
 		{	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
 			fprintf(fpAFDS, "\nFindStart: size left: %d, nLen=%d, wId=%04x\n", size, pa->nLen, pa->wId);
@@ -739,7 +739,7 @@ BOOL FindOffThresh(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 
 // Type = 11 for primary left, 12 for primary right, 13 sec left, 14 sec right
 BOOL FindVASI(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
-{	while ((size > 6) && (size >= pa->nLen))
+{	while (pa->nLen && (size > 6) && (size >= pa->nLen))
 	{	int nThisLen = pa->nLen;
 
 		if (fUserAbort) return 0;
@@ -1089,7 +1089,6 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	{	wGateCtr = (WORD) (*pLastSetGateList & 0xffff);
 		ppg = (NGATE **) &pLastSetGateList[1];
 		ppg3 = (NGATE3 **) (((*pLastSetGateList >> 16) == OBJTYPE_NEWNEWTAXIPARK) ? ppg : 0);
-		// ############### MSFSTAXIPARK ?? #########
 	}
 
 	if (!twh)
@@ -1810,6 +1809,265 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 }
 
 /******************************************************************************
+		 NewMakeTaxiwayList3 for MSFS
+******************************************************************************/
+
+TWHDR* NewMakeTaxiwayList3(NEWTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WORD wN, WORD wP)
+{
+	WORD wo = wN, w2;
+	int wp1, wp2;
+	int nAllocSize = (40 * wP) + (32 * wT * wP);
+	TWHDR* twh = (TWHDR*)malloc(nAllocSize);
+	TWHDR* twh0 = twh;
+
+	WORD wGateCtr = 0;
+	NGATE2** ppg4;
+	LOCATION locg;
+
+	if (pLastSetGateList)
+	{	wGateCtr = (WORD)(*pLastSetGateList & 0xffff);
+		ppg4 = (NGATE2**)&pLastSetGateList[1];	
+	}
+
+	if (!twh)
+	{
+		fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+			nAllocSize, wT, wP, wN);
+		return 0;
+	}
+
+	while (wo)
+	{
+		WORD wMin = 0, wF = 0xffff;
+		WORD w = 0, wPts = 0;
+		BOOL fDone = FALSE;
+		TW* tw = (TW*)&twh[1];
+
+		while (w < wN)
+		{	// Find next lowest taxiway name
+			if (pN[w].szName[0] != 0xFF)
+			{
+				if (w && (strncmp(pN[wMin].szName, pN[w].szName, 8) >= 0))
+					wMin = w;
+				fDone = TRUE;
+			}
+
+			w++;
+		}
+
+		if (!fDone) break; // All done now
+
+		memcpy(twh->chName, pN[wMin].szName, 8);
+		twh->fMaxWid = 0.0F;
+		twh->fMinWid = 3000000.0F;
+		twh->wPoints = wPts;
+
+		// Search for 1st point in chained path fragment
+		for (w = 0; w < wP; w++)
+		{
+			if ((pP[w].bNumber == wMin) &&
+				((((pP[w].bDrawFlags == 1) || (pP[w].bDrawFlags == 4)) &&					// #T# TAXIWAY TYPE #T#
+					(pP[w].wEnd < wT) && (pP[w].wStart < wT)) ||
+
+					((pP[w].bDrawFlags == 3) &&
+						(pP[w].wEnd < wGateCtr) && (pP[w].wStart < wT))
+					))
+			{
+				BOOL f1seen = FALSE;
+				BOOL f2seen = FALSE;
+
+				wp2 = (pP[w].bDrawFlags == 3) ? -(pP[w].wEnd + 1) : pP[w].wEnd;
+				wp1 = pP[w].wStart;
+
+				// See if this has a lone end
+				for (w2 = 0; w2 < wP; w2++)
+				{
+					if ((pP[w2].bNumber == wMin) && (w2 != w) &&
+						((((pP[w].bDrawFlags == 1) || (pP[w].bDrawFlags == 4)) &&					// #T# TAXIWAY TYPE #T#
+							(pP[w].wEnd < wT) && (pP[w].wStart < wT)) ||
+
+							((pP[w].bDrawFlags == 3) &&
+								(pP[w].wEnd < wGateCtr) && (pP[w].wStart < wT))
+							))
+					{
+						if ((pP[w2].wStart == wp1) || (pP[w2].wEnd == wp1))
+							f1seen = TRUE;
+						if ((pP[w2].wStart == wp2) || (pP[w2].wEnd == wp2))
+							f2seen = TRUE;
+
+						if (f1seen && f2seen)
+							break;
+					}
+				}
+
+				wF = w;
+
+				if (!f1seen || !f2seen)
+				{
+					if (f1seen)
+					{
+						int wrk = wp1;
+						wp1 = wp2;
+						wp2 = wrk;
+					}
+
+					break;
+				}
+			}
+		}
+
+		if (wF != 0xffff)
+		{	// Start found, maybe (else circular or multiple)
+			WORD wStart = wp1;
+			char szTaxiway[9];
+			szTaxiway[8] = 0;
+
+			w = wF;
+
+			if (wp1 >= 0)
+			{
+				tw[wPts].bOrientation = pT[wp1].bOrientation;
+				tw[wPts].bType = pT[wp1].bType;
+				if (fNoDrawHoldConvert && (pT[wp1].bType == 5))
+					// Convert "no draw" holds to normal types ### 4880
+					tw[wPts].bType = 7;
+				tw[wPts].fLat = pT[wp1].fLat;
+				tw[wPts].fLon = pT[wp1].fLon;
+			}
+
+			else
+			{
+				int wp1x = (-wp1) - 1;
+				SetLocPos(&locg, 0,
+					(*(ppg4[wp1x])).nLat, (*(ppg4[wp1x])).nLon,
+					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				tw[wPts].bOrientation = 0;
+				tw[wPts].bType = 5;
+			}
+
+			tw[wPts].fWid = pP[wF].fWidth;
+			tw[wPts].bPtype = pP[w].bDrawFlags; // Path type
+			twh->fMaxWid = twh->fMinWid = pP[w].fWidth;
+			// if (pP[w].bDrawFlags != 1) twh->chName[0] = 0;// No names for non-taxi. #T#
+			wPts++;
+			strncpy(szTaxiway, twh->chName, 8);
+
+			if (wp1 >= 0)
+				fprintf(fpAFDS, "        TaxiWay %s: %d", szTaxiway, wp1);
+			else
+				fprintf(fpAFDS, "        TaxiWay %s: G%d", szTaxiway, (-wp1) - 1);
+
+			// Set next point and find further reference
+			while (1)
+			{
+				if (wp2 >= 0)
+				{
+					tw[wPts].bOrientation = pT[wp2].bOrientation;
+					tw[wPts].bType = pT[wp2].bType;
+					if (fNoDrawHoldConvert && (pT[wp2].bType == 5))
+						// Convert "no draw" holds to normal types ### 4880
+						tw[wPts].bType = 7;
+					tw[wPts].fLat = pT[wp2].fLat;
+					tw[wPts].fLon = pT[wp2].fLon;
+				}
+
+				else
+				{
+					int wp2x = (-wp2) - 1;
+					SetLocPos(&locg, 0,
+						(*(ppg4[wp2x])).nLat, (*(ppg4[wp2x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					tw[wPts].bOrientation = 0;
+					tw[wPts].bType = 5;
+				}
+
+				tw[wPts].bPtype = 0; // Path type
+				tw[wPts].fWid = 0; // Terminate, for now
+				wPts++;
+
+				pP[w].bDrawFlags = 0; // Don't use again
+
+				if (wp2 >= 0)
+					fprintf(fpAFDS, "-%d", wp2);
+				else
+					fprintf(fpAFDS, "-G%d", (-wp2) - 1);
+
+				if (wp2 == wStart)
+				{
+					fprintf(fpAFDS, " [looped]");
+					break; // Looped path
+				}
+
+				// Find next reference, left or right ...
+				for (w = 0; w < wP; w++)
+				{
+					if ((pP[w].bNumber == wMin) &&
+						((((pP[w].bDrawFlags == 1) || (pP[w].bDrawFlags == 4)) &&					// #T# TAXIWAY TYPE #T#
+							(pP[w].wEnd < wT) && (pP[w].wStart < wT)) ||
+
+							((pP[w].bDrawFlags == 3) &&
+								(pP[w].wEnd < wGateCtr) && (pP[w].wStart < wT))
+							) &&
+
+						((pP[w].wStart == wp2) ||
+							((pP[w].bDrawFlags != 3) && (pP[w].wEnd == wp2))
+							))
+						break;
+				}
+
+				if (w >= wP)
+					break;
+
+				tw[wPts - 1].bPtype = pP[w].bDrawFlags; // Path type
+				tw[wPts - 1].fWid = pP[w].fWidth;
+				if (twh->fMaxWid < pP[w].fWidth)
+					twh->fMaxWid = pP[w].fWidth;
+				if (twh->fMinWid > pP[w].fWidth)
+					twh->fMinWid = pP[w].fWidth;
+
+				wp2 = (pP[w].wStart == wp2) ?
+					((pP[w].bDrawFlags == 3) ? -(pP[w].wEnd + 1) : pP[w].wEnd) :
+					pP[w].wStart;
+			}
+
+			fprintf(fpAFDS, "\n");
+		}
+
+		else
+		{	// Done with this path name now.
+			pN[wMin].szName[0] = 0xFF;
+			wo--;
+		}
+
+		twh->wPoints = wPts;
+		if (wPts) twh = (TWHDR*)&tw[wPts];
+	}
+
+	twh->wPoints = 0; // terminator
+
+	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
+	//	(int) &twh[1] - (int) twh0, nAllocSize);
+
+	if (nAllocSize > ((int)&twh[1] - (int)twh0))
+	{	// Revise allocation to suit needs
+		TWHDR* twh1 = malloc(32 + (int)&twh[1] - (int)twh0);
+		if (twh1)
+		{
+			memcpy((BYTE*)twh1, (BYTE*)twh0, (int)&twh[1] - (int)twh0);
+			free(twh0);
+			twh0 = twh1;
+		}
+	}
+
+	//	if (pLastSetGateList)
+	//	{	free(pLastSetGateList);
+	//		pLastSetGateList = 0;
+	//	}
+
+	return twh0;
+}
+
+/******************************************************************************
          copyxmlstring
 ******************************************************************************/
 
@@ -1876,6 +2134,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 	NTAXI *pTpath = 0;
 	NEWNTAXI *pNTpath = 0;
 	NEWNTAXI2 *pNTpath2 = 0;
+	MSFSNTAXI* pNTpath3 = 0;
 	NTAXIPT *pTpnt = 0;
 	NEWTAXIPT *pNTpnt = 0;
 	NTAXINM *pTname = 0;
@@ -1926,7 +2185,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			// decode ICAO
 			DecodeID(id, chICAO, 1);
-			
 			nThisLen = sizeof(NAPT);
 			if (pa->wId == OBJTYPE_AIRPORT) nThisLen -= 4;
 			else if (pa->wId == OBJTYPE_NEWNEWAIRPORT) nThisLen += 4;
@@ -1939,7 +2197,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 						fDebugThisEntry = TRUE;
 				#endif
 
-				//if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
+				if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
 				
 				fprintf(fpAFDS, "\nAirport %s :", chICAO);
 				
@@ -2253,6 +2511,13 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 						FindAppLights(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 15);
 					}
 	
+	/*				else if (pa->wId == OBJTYPE_MSFSRUNWAY)
+					{	FindOffThresh(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 5);
+						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 11);
+						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 12);
+						FindAppLights(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 15);
+					}
+	*/
 					else
 					{	//******************** THIS METHOD DOESN'T WORK ON OLDER BGLs. WHY? **************
 						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 5);
@@ -2293,13 +2558,19 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					}
 
 					else if (pa->wId == OBJTYPE_NEWRUNWAY)
-					{	FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
-						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 11);
-						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 12);
-						FindAppLights(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 15);
+					{	FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
+						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 11);
+						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 12);
+						FindAppLights(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 15);
 					}
 
-
+			/*		else if (pa->wId == OBJTYPE_MSFSRUNWAY)
+					{	FindOffThresh(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 5);
+						FindVASI(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 11);
+						FindVASI(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 12);
+						FindAppLights(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 15);
+					}
+			*/
 					else
 					{	//******************** THIS METHOD DOESN'T WORK ON OLDER BGLs. WHY? **************
 						FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 6);
@@ -2599,7 +2870,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NGATE *pg = (NGATE *) ((BYTE *) pa + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pa->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pa->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
-			// ################ MSFSTAXIPARK?? ####################
+			if (pa->wId == OBJTYPE_MSFSTAXIPARK) pg2 = pg;
 
 			nThisLen = pgh->nLen;
 
@@ -2665,6 +2936,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				pLastSetGateList[w] = (int) pg; // Index for use in Taxipath decode
 				pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) + 
 					(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
+				if (pa->wId == OBJTYPE_MSFSTAXIPARK)
+					pg = (NGATE*) ((BYTE *) pg + 20); // 20 additional bytes
 				if (pg2) pg2 = (NGATE2 *) pg;
 				if (pg3) pg3 = (NGATE3 *) pg;
 			}
@@ -2707,7 +2980,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				}
 			}
 
-			else if ((pa->wId == OBJTYPE_NEWTAXIPATH) || (pa->wId == OBJTYPE_MSFSTAXIPATH)) // ############# MSFSTAXIPATH? ##########
+			else if (pa->wId == OBJTYPE_NEWTAXIPATH)
 			{	pNTpath = (NEWNTAXI *) ((BYTE *) pa + sizeof(NTAXIHDR));
 				fNewTaxiPath = TRUE;
 				wTpath = pth->wCount;		
@@ -2728,6 +3001,31 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 						pNTpath[w].bDrawFlags < 6 ? pszPathTypes[pNTpath[w].bDrawFlags] : "?",
 						pNTpath[w].wStart, (pNTpath[w].bDrawFlags == 3) ? "G" : "",
 						pNTpath[w].wEnd, (double) pNTpath[w].fWidth);
+					w++;
+				}
+			}
+
+			else if (pa->wId == OBJTYPE_MSFSTAXIPATH)
+			{	pNTpath3 = (MSFSNTAXI*)((BYTE*)pa + sizeof(NTAXIHDR));
+				fNewTaxiPath = -1;
+				wTpath = pth->wCount;
+				nThisLen = pth->nLen;
+
+				while (w < wTpath)
+				{	// For now just dump to txt file:
+					static char* pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
+
+					pNTpath3[w].wEnd &= 0x0fff;
+					pNTpath3[w].wStart &= 0x0fff;
+					pNTpath3[w].bDrawFlags &= 0x0f;
+
+					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n",
+						(pNTpath3[w].bDrawFlags == 2) ? "Runway " : "Name #",
+						pNTpath3[w].bNumber,
+						pNTpath3[w].bDrawFlags,
+						pNTpath3[w].bDrawFlags < 6 ? pszPathTypes[pNTpath3[w].bDrawFlags] : "?",
+						pNTpath3[w].wStart, (pNTpath3[w].bDrawFlags == 3) ? "G" : "",
+						pNTpath3[w].wEnd, (double)pNTpath3[w].fWidth);
 					w++;
 				}
 			}
@@ -2847,12 +3145,16 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			if (pNTpnt)
 			{	rwy1.pTaxiwayList = 
 					fNewTaxiPath ?
+					(fNewTaxiPath == -1) ?
+						NewMakeTaxiwayList3(pNTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
 						NewMakeTaxiwayList2(pNTpnt, pTname, pNTpath2, wTpnt, wTname, wTpath) :
 						MakeTaxiwayList2(pNTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
 			}
 			else if (pTpnt)
 			{	rwy1.pTaxiwayList = 
 					fNewTaxiPath ?
+					(fNewTaxiPath == -1) ?
+						NewMakeTaxiwayList3(pTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
 						NewMakeTaxiwayList(pTpnt, pTname, pNTpath, wTpnt, wTname, wTpath) :
 						MakeTaxiwayList(pTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
 			}
