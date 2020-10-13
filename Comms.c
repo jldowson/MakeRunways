@@ -127,7 +127,8 @@ void MakeCommsFile(void)
 					
 					errnum = 2;
 					if (fAddName)
-					{	char chFreqs2[14][6];
+					{	BOOL fDoneName = FALSE;
+						char chFreqs2[14][6];
 						// was static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, -1, -1, -1, 1, -1 };
 						static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, 1, 1, 1, 1, -1 };
 						memset(chFreqs2, 0, sizeof(chFreqs2));
@@ -150,6 +151,7 @@ void MakeCommsFile(void)
 									if (psz) *psz = '-';
 								} while (psz);
 								fprintf(pf2, "%.4s,%s", pchICAO, chName);
+								fDoneName = TRUE;
 								break;
 							}
 							k--;
@@ -189,6 +191,8 @@ void MakeCommsFile(void)
 
 						errnum = 9;
 
+						if (!fDoneName)
+							fprintf(pf2, "%.4s,%s", pchICAO, c[0].szName);
 						for (t = 0; t < 8; t++)
 							fprintf(pf2, ",%.6s", chFreqs2[t][0] ? chFreqs2[t] : "0");
 						fprintf(pf2, "\x0d\x0a");

@@ -2614,7 +2614,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				nFreq = 0;
 			}
 			
-			if (!nFreq)
+			if (pr->nPrimaryIlsId && !nFreq)
 			{	nFreq = MatchILS(nObjs, ps, p, chWork, &rwy1, 1);
 				if (!nFreq  && pr->nPrimaryIlsId)
 				{	fprintf(fpAFDS, "\n              *** No matching ILS record - assume provided by another layer");
@@ -2676,7 +2676,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				nFreq = 0;
 			}
 			
-			if (!nFreq)
+			if (pr->nSecondaryIlsId && !nFreq)
 			{	nFreq = MatchILS(nObjs, ps, p, chWork, &rwy2, 1);
 				if (!nFreq  && pr->nSecondaryIlsId)
 				{	fprintf(fpAFDS, "\n              *** No matching ILS record - assume provided by another layer");
@@ -3212,6 +3212,7 @@ void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 			if (!p)
 			{	// Read complete file
 				p = (BYTE *) malloc(fsize);
+				ulTotalBytes += fsize - sizeof(NBGLHDR);
 				nOffsetBase = (int) p;
 
 				fseek(fpIn, 0, SEEK_SET);

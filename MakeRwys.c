@@ -92,6 +92,7 @@ BOOL fUserAbort = 0, fWritingFiles = FALSE, fNewAirport = FALSE, fQuiet = FALSE;
 BOOL fNoLoadLorby = FALSE;
 int fFS9 = 0;
 DWORD ulTotalAPs = 0, ulTotalRwys = 0;
+DWORD ulTotalBGLs = 0, ulTotalBytes = 0;
 
 BYTE chASCII[257] =
 "................................ !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~."\
@@ -929,13 +930,37 @@ void ScanSceneryArea(char *pszPath)
 	hFind = FindFirstFile(szParam, (WIN32_FIND_DATA *) &find);
 	while (hFind != INVALID_HANDLE_VALUE)
 	{	char *pch = strrchr(find.cFileName, '.');
+		char* psz = 0;
 				
 		if (fUserAbort) return;
 				
 		if (pch && (_strnicmp(pch, ".BGL", 5) == 0)) // Eliminate files like "bgl_passive"
-		{	strcpy(&szParam[fpos], find.cFileName);
-				
-			SetWindowText(GetDlgItem(hWnd, IDC_FILE), szParam);
+		{	char szFile1[MAX_PATH], szFile2[MAX_PATH], szFile3[MAX_PATH];
+			szFile2[0] = szFile3[0] = 0;
+			strcpy(&szParam[fpos], find.cFileName);
+			++ulTotalBGLs;
+
+			strcpy(szFile1, szParam);
+			if (fMSFS)
+			{	psz = strstr(szFile1, "Community");
+				if (!psz) psz = strstr(szFile1, "Official");
+				if (psz)
+				{	strcpy(szFile2, psz);
+					*psz = 0;
+					psz = strrchr(szFile2, '\\');
+				}
+			}
+			else
+				psz = strrchr(szFile1, '\\');
+			if (psz)
+			{	psz++;
+				strcpy(szFile3, psz);
+				*psz = 0;
+			}
+
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE1), szFile1);
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE2), szFile2);
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE3), szFile3);
 			PostMessage(hWnd, WM_USER, 1, 0);
 								
 			fpIn = fopen(szParam, "rb");
@@ -950,7 +975,8 @@ void ScanSceneryArea(char *pszPath)
 				// See if file contains AFDs:
 				if ((fFS9 >= 0) && (fread(&nbglhdr, 1, sizeof(NBGLHDR), fpIn) >= 
 							(sizeof(NBGLHDR) - ((NSECTS_PER_FILE - 1) * sizeof(NSECTS)))))
-				{	if (nbglhdr.wStamp == 0x0201)
+				{	ulTotalBytes += sizeof(NBGLHDR);
+					if (nbglhdr.wStamp == 0x0201)
 					{	// New BGL format for FS2004?
 						strcpy(szCurrentFilePath, szParam);
 						CheckNewBGL(fpIn, &nbglhdr, find.nFileSizeLow);
@@ -1255,8 +1281,10 @@ MAINLOOPS:
 			fprintf(fpAFDS, "\n%s%s\n", chLine, szAreaWk);
 			
 			SetWindowText(GetDlgItem(hWnd, IDC_AREA), szAreaWk);
-			SetWindowText(GetDlgItem(hWnd, IDC_FILE), "");
-		
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE1), "");
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE2), "");
+			SetWindowText(GetDlgItem(hWnd, IDC_FILE3), "");
+
 			if (!bActive[nArea])
 			{	fprintf(fpAFDS, "... Not Active\n");
 				nArea++;
@@ -1772,8 +1800,10 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 			{	case 0:
 					SetWindowText(GetDlgItem(hWnd, IDC_AREA),
 						(lParam & 2) ? "All main data files produced okay" : "Failed to make all of the data files!");
-					SetWindowText(GetDlgItem(hWnd, IDC_FILE),
+					SetWindowText(GetDlgItem(hWnd, IDC_FILE1),
 						(lParam & 1) ? " " : "Failed to make FStarRC RWS file!");
+					SetWindowText(GetDlgItem(hWnd, IDC_FILE2), "");
+					SetWindowText(GetDlgItem(hWnd, IDC_FILE3), "");
 					SetWindowText(GetDlgItem(hWnd, IDC_PRESS),"OK");
 					if (!fQuiet) MessageBeep(MB_ICONEXCLAMATION);
 					// Drop through ...
@@ -1781,7 +1811,11 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 				case 1: //Airports or runways
 				case 2:
 					sprintf(wk, "Total airports = %d, runways = %d", ulTotalAPs, ulTotalRwys);
-					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS), wk);
+					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS1), wk);
+					int x = sprintf(wk, "Number of BGLs = %d", ulTotalBGLs);
+					if (ulTotalBytes)
+						sprintf(&wk[x], ", Bytes scanned = %d", ulTotalBytes);
+					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS2), wk);
 					break;
 					
 				default:

@@ -4,8 +4,11 @@
 //
 #define IDD_MAKERWYS                    101
 #define IDC_AREA                        1001
-#define IDC_FILE                        1002
-#define IDC_TOTALS                      1003
+#define IDC_FILE1                        1002
+#define IDC_FILE2                        1005
+#define IDC_FILE3                        1006
+#define IDC_TOTALS1                      1003
+#define IDC_TOTALS2                      1007
 #define ID_PRESS                        1004
 #define IDC_PRESS                       1004
 

@@ -566,3 +566,5 @@ typedef struct _NAPRON2HDR // triangles apron type
 	WORD wTCount;			// 000A - count of triangles
 	DWORD dwLatLons[0];		// Pairs of Lat Lons for vertices
 } NAPRON2HDR;
+
+extern DWORD ulTotalBGLs, ulTotalBytes;
