@@ -1,6 +1,6 @@
 /* NewBGLs.c
 *******************************************************************************/
-#define DEBUG_THIS_ICAO "EGLL"
+#define DEBUG_THIS_ICAO "EGLC"
 
 #include "MakeRwys.h"
 
@@ -644,7 +644,7 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 
 		if (fUserAbort) return 0;
 		
-		/**************************************************
+		//**************************************************
 		if (fDebug)	
 		{	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
 			fprintf(fpAFDS, "\nFindStart: size left: %d, nLen=%d, wId=%04x\n", size, pa->nLen, pa->wId);
@@ -697,43 +697,11 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 }
 
 /******************************************************************************
-		DebugRwyAdditions
-******************************************************************************/
-
-// Type = 5 for primary, 6 for secondary
-void DebugRwyAdditions(NAPT * pa, DWORD size)
-{	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen, i = 0, x, j;
-		char wk[256];
-		BYTE* pb = (BYTE *) pa;
-
-		if (fUserAbort) return 0;
-		
-		fprintf(fpAFDS, "### AFTER RWY: at OFFSET %08X ID=%04X LEN=%d\n",
-			(int) ((BYTE *) &pa->wId - nOffsetBase), pa->wId, nThisLen);
-		j = nThisLen;
-		while (j--)
-		{	if ((i & 15) == 0)
-				x = sprintf(wk, "   %04X:", i);
-			x += sprintf(&wk[x], " %02X", *pb++);
-			if (((++i & 15) == 0) || (j == 0))
-			{	fprintf(fpAFDS, "%s\n", wk);
-				x = 0;
-			}
-		}
-
-		if (nThisLen == 0) break; // Safety precaution (why needed?)
-		size -= nThisLen;
-		pa = (NAPT*)((BYTE*)pa + nThisLen);
-	}
-}
-
-/******************************************************************************
          FindOffThresh
 ******************************************************************************/
 
-// Type = 5 for primary, 6 for secondary: negative for MSFS (my conventio)
-BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, short int nType)
+// Type = 5 for primary, 6 for secondary
+BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, WORD nType)
 {
 	while ((size > 6) && (size >= pa->nLen))
 	{	int nThisLen = pa->nLen;
@@ -742,15 +710,19 @@ BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, short int nType)
 
 		prwy->nOffThresh = 0;
 
-		if ((pa->wId == nType) || (pa->wId == -nType))
-		{	// Threshold record found
-			NOFFTHR *ps = (NOFFTHR *) ((BYTE *) pa + ((nType < 0) ? 16 : 0));
+		if (fDebug)
+			fprintf(fpAFDS,"### Checking for Start ID %d, Found %d (ThisLen = %d)\n",
+					nType, pa->wId, nThisLen);
+		
+		if (pa->wId == nType)
+		{	// Start record found
+			NOFFTHR *ps = (NOFFTHR *) pa;
 
-			nThisLen = pa->nLen;
+			nThisLen = ps->nLen;
 			prwy->nOffThresh = (unsigned int) ((ps->fLength * 3.28084F) + .5F);
 
 			fprintf(fpAFDS, "              Offset Threshold %s: %d feet\n",
-				(abs(nType) == 5) ? "primary" : "secondary", prwy->nOffThresh); 
+				nType == 5 ? "primary" : "secondary", prwy->nOffThresh); 
 			return TRUE;
 		}
 
@@ -808,7 +780,7 @@ BOOL FindVASI(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
          FindAppLights
 ******************************************************************************/
 
-// Type = 15 primary, 16 secondary, or 0xDF, 0xE0 for MSFS
+// Type = 15 primary, 16 secondary
 BOOL FindAppLights(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 {	while ((size > 6) && (size >= pa->nLen))
 	{	int nThisLen = pa->nLen;
@@ -818,7 +790,7 @@ BOOL FindAppLights(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 		// ########## ??? prwy->nOffThresh = 0;
 		
 		if (pa->wId == nType)
-		{	// Applights record found
+		{	// Start record found
 			approachlights_t *ps = (approachlights_t *) pa;
 
 			nThisLen = ps->nLen;
@@ -2131,7 +2103,7 @@ void CorrectRunwayMagvar(char *pchICAO, float fNewMagvar)
 {	if (pR)
 	{	RWYLIST *p = pR;
 		while (p)
-		{	if (!p->fDelete && p->fAirport && (strnicmp(pchICAO, p->r.chICAO, 4) == 0)) // WAS !p->fAirport
+		{	if (!p->fDelete && !p->fAirport && (strnicmp(pchICAO, p->r.chICAO, 4) == 0))
 			{	float fILShdg = (float) atof(p->r.chILSHdg);
 				char chILS[16];
 				p->fHdg += p->fMagvar - fNewMagvar;
@@ -2146,65 +2118,6 @@ void CorrectRunwayMagvar(char *pchICAO, float fNewMagvar)
 			p = p->pTo;
 		}
 	}
-}
-
-/******************************************************************************
-		 FindILSdetails
-******************************************************************************/
-
-void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, int nMode)
-{
-	float fILSHdgMag;
-	int nFreq = MatchILS(nObjs, ps, p, psz, prwy, 1);
-
-	if (!nFreq)
-		return;
-
-	if (!fMatchedILS)
-		return;
-
-	sprintf(prwy->r.chILS, "%.2f", nFreq / 100.0);
-	fILSHdgMag = fILSheading - prwy->fMagvar;
-	if (fILSHdgMag <= 0.0F) fILSHdgMag += 360.0F;
-	else if (fILSHdgMag > 360.0F) fILSHdgMag -= 360.0F;
-
-	char wk[8];
-	int l = l = sprintf(wk, "%.3f", (double)fILSHdgMag);
-	if (l > 5) wk[5] = 0;
-	else if (wk[l - 1] == '0') wk[l - 1] = 0;
-	memcpy(prwy->r.chILSHdg, wk, 6);
-
-	fprintf(fpAFDS, "\n              ");
-	fprintf(fpAFDS, "Primary ILS: %s  %s Hdg: %.1f %s%s%s%s \x22%s\x22",
-		psz, prwy->r.chILS, (double)fILSheading,
-		(prwy->fILSflags & 0x1C) ? ", Flags:" : "",
-		(prwy->fILSflags & 0x08) ? " GS" : "",
-		(prwy->fILSflags & 0x10) ? " DME" : "",
-		(prwy->fILSflags & 0x04) ? " BC" : "", chNameILS);
-	strncpy(prwy->r.chNameILS, chNameILS, 31);
-	prwy->r.chNameILS[31] = 0;
-}
-
-/******************************************************************************
-		 GetNamestring
-******************************************************************************/
-
-void GetNameString(char* p)
-{	char* psz;
-	if (*p == 0)
-		return;
-	psz = strstr(pLocPak, &p[3]);
-	if (psz)
-	{	char* psz2;
-		psz = strstr(psz, ": \x22");
-		if (psz)
-		{	psz += 3;
-			psz2 = strchr(psz, '\x22');
-			strncpy(p, psz, (int)(psz2 - psz));
-			p[psz2 - psz] = 0;
-		}
-	}
-	else p[0] = 0;
 }
 
 /******************************************************************************
@@ -2295,18 +2208,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 				// Now go through all existing runway records for this airport and "correct" the Magvar ...
 				CorrectRunwayMagvar(&chICAO[0], fMagvar);
-
-				// Also check for addition of ILS details to runways
-				if (pR)
-				{	RWYLIST* pRL = pR;
-					while (pRL)
-					{	if (!pRL->fDelete && pRL->fAirport && (strnicmp(chICAO, pRL->r.chICAO, 4) == 0))
-						{	if (pRL->r.chILSid[0])
-								FindILSdetails(nObjs, ps, p, pRL->r.chILSid, pRL, 1);
-						}
-						pRL = pRL->pTo;
-					}
-				}
 			
 				WritePosition(&loc, 1);
 
@@ -2332,7 +2233,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 							if (nCountries > nCountryNum)
 							{	copyxmlstring(pNextCountryName, (char *) ppCountries + ppCountries[nCountryNum] + (nCountries * 4));
-								if (pLocPak) GetNameString(pNextCountryName);
 								fprintf(fpAFDS, "\n          Country Name=\x22%s\x22", pNextCountryName);
 								pCtyName = pNextCountryName;
 								pNextCountryName += strlen(pNextCountryName) + 1;
@@ -2340,7 +2240,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 							if (nStates > nStateNum)
 							{	copyxmlstring(pNextStateName, (char *) ppStates + ppStates[nStateNum] + (nStates * 4));
-								if (pLocPak) GetNameString(pNextStateName);
 								fprintf(fpAFDS, "\n          State Name=\x22%s\x22", pNextStateName);
 								pStaName = pNextStateName;
 								pNextStateName += strlen(pNextStateName) + 1;
@@ -2348,7 +2247,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 							if (nCities > nCityNum)
 							{	copyxmlstring(pNextCityName, (char *) ppCities + ppCities[nCityNum] + (nCities * 4));
-								if (pLocPak) GetNameString(pNextCityName);
 								fprintf(fpAFDS, "\n          City Name=\x22%s\x22", pNextCityName);
 								pCitName = pNextCityName;
 								pNextCityName += strlen(pNextCityName) + 1;
@@ -2356,8 +2254,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 							if (nAirports > nAirportNum)
 							{	copyxmlstring(pNextAirportName, (char *) ppAirports + ppAirports[nAirportNum] + (nAirports * 4));
-								if (pLocPak) GetNameString(pNextAirportName);
-								fprintf(fpAFDS, "\n          Airport Name=\x22%s\x22\n", pNextAirportName);
+                        		fprintf(fpAFDS, "\n          Airport Name=\x22%s\x22\n", pNextAirportName);
 								pApName = pNextAirportName;
 								pNextAirportName += strlen(pNextAirportName) + 1;
 							}
@@ -2514,7 +2411,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					|| (pa->wId == OBJTYPE_MSFSRUNWAY)))
 		{	// Runway record found
 			NRWY *pr = (NRWY *) pa;
-			int nFreq = 0, fOk = 0, fList = 0;
+			int nFreq, fOk = 0, fList = 0;
 			ANGLE Rlat, Rlong;
 			WORD wSurf;
 
@@ -2598,39 +2495,34 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 								chWork2, (double) rwy1.r.fLat, (double) rwy1.r.fLong); 
 
 					if (fDebug)
-					{	fprintf(fpAFDS, "### %sRunway1 struct (len=%04X, size=%04x):\n",
+						fprintf(fpAFDS,"### %sRunway1 struct (len=%04X, size=%04x):\n",
 							(pa->wId == OBJTYPE_NEWRUNWAY) ? "New" :
 							(pa->wId == OBJTYPE_MSFSRUNWAY) ? "MSFS" : "", pa->nLen,
 							(pa->wId == OBJTYPE_MSFSRUNWAY) ? OBJTYPE_MSFSRUNWAY_LEN : sizeof(NRWY));
-					}
 					
 					if (pa->wId == OBJTYPE_RUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY)), nThisLen - sizeof(NRWY));
-						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 5);
+					{	FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 12);
 						FindAppLights(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 15);
 					}
 
 					else if (pa->wId == OBJTYPE_NEWRUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16);
-						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
+					{	FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 12);
 						FindAppLights(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 15);
 					}
 	
-					else if (pa->wId == OBJTYPE_MSFSRUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN);
-						FindOffThresh(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, -5);
+/*					else if (pa->wId == OBJTYPE_MSFSRUNWAY)
+					{	FindOffThresh(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 5);
 						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 11);
 						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 12);
-						FindAppLights(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 0xdf);
+						FindAppLights(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 15);
 					}
-	
+*/	
 					else
 					{	//******************** THIS METHOD DOESN'T WORK ON OLDER BGLs. WHY? **************
-						if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + pa->nLen), nThisLen - pa->nLen);
 						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 12);
@@ -2669,19 +2561,19 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					}
 
 					else if (pa->wId == OBJTYPE_NEWRUNWAY)
-					{	FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 6);
+					{	FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
 						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 11);
 						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 12);
 						FindAppLights(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 15);
 					}
 
-					else if (pa->wId == OBJTYPE_MSFSRUNWAY)
-					{	FindOffThresh(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, -6);
+			/*		else if (pa->wId == OBJTYPE_MSFSRUNWAY)
+					{	FindOffThresh(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 5);
 						FindVASI(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 11);
 						FindVASI(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 12);
-						FindAppLights(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 0xe0);
+						FindAppLights(&rwy2, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 15);
 					}
-
+			*/
 					else
 					{	//******************** THIS METHOD DOESN'T WORK ON OLDER BGLs. WHY? **************
 						FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 6);
@@ -2716,9 +2608,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			if (pr->nPrimaryIlsId)
 			{	DecodeID(pr->nPrimaryIlsId, chWork, 0);
 				fprintf(fpAFDS, "\n              Primary ILS ID = %s", chWork);
+				nFreq = MatchILS(nObjs, ps, p, chWork, &rwy1, 0);
 				strcpy(chILSidP, chWork);
-				memcpy(rwy1.r.chILSid, chILSidP, 6);
-				FindILSdetails(nObjs, ps, p, chILSidP, &rwy1, 1);
 			}
 			
 			else
@@ -2726,19 +2617,131 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				nFreq = 0;
 			}
 			
+			//################################################################
+			if (pr->nPrimaryIlsId && !nFreq)
+			{	nFreq = MatchILS(nObjs, ps, p, chWork, &rwy1, 1);
+				if (!nFreq  && pr->nPrimaryIlsId)
+				{	fprintf(fpAFDS, "\n              *** No matching ILS record - assume provided by another layer");
+					fList = 1;
+				}
+			}
+
+			if (nFreq)
+			{	float fILSHdgMag;
+				if (!fMatchedILS)
+				{	fList = 1;
+					if (pr->nPrimaryIlsId)
+					{	fprintf(fpAFDS, " ... ILS ERROR! The ILS ID doesn't match!");
+						chILSidP[0] = 0;
+					}
+					else
+						fprintf(fpAFDS, "\n              Primary ILS ERROR! There is an ILS, but the Runway record does not ID this!!");
+				}
+				
+				sprintf(rwy1.r.chILS, "%.2f", nFreq/100.0);
+				fILSHdgMag = fILSheading - fMagvar;
+				if (fILSHdgMag <= 0.0F) fILSHdgMag += 360.0F;
+				else if (fILSHdgMag > 360.0F) fILSHdgMag -= 360.0F;
+
+				{	char wk[8];
+					int l = l = sprintf(wk, "%.3f", (double) fILSHdgMag);
+					if (l > 5) wk[5] = 0;
+					else if (wk[l-1] == '0') wk[l-1] = 0;
+					memcpy(rwy1.r.chILSHdg, wk, 6);
+				}
+
+				strncpy(rwy1.r.chILSid, chILSidP, 8);
+				
+				fprintf(fpAFDS, "\n              ");
+
+				//if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", nOffsetILS, nOffsetILS+nSizeILS);
+				
+				fprintf(fpAFDS, "Primary ILS: %s  %s Hdg: %.1f %s%s%s%s \x22%s\x22",
+				chWork, rwy1.r.chILS, (double) fILSheading,
+				(rwy1.fILSflags & 0x1C) ? ", Flags:" : "",
+				(rwy1.fILSflags & 0x08) ? " GS" : "",
+				(rwy1.fILSflags & 0x10) ? " DME" : "",
+				(rwy1.fILSflags & 0x04) ? " BC" : "", chNameILS);
+				strncpy(rwy1.r.chNameILS, chNameILS, 31);
+				rwy1.r.chNameILS[31] = 0;
+			}
+			//#########################################################
+						
 			if (pr->nSecondaryIlsId)
 			{	DecodeID(pr->nSecondaryIlsId, chWork, 0);
 				fprintf(fpAFDS, "\n              Secondary ILS ID = %s", chWork);
+				nFreq = MatchILS(nObjs, ps, p, chWork, &rwy2, 0);
 				strcpy(chILSidS, chWork);
-				memcpy(rwy2.r.chILSid, chILSidS, 6);
-				FindILSdetails(nObjs, ps, p, chILSidS, &rwy2, 1);
 			}
 			
 			else
 			{	chWork[0] = 0;
 				nFreq = 0;
 			}
-						
+			
+			//########################################################
+			if (pr->nSecondaryIlsId && !nFreq)
+			{	nFreq = MatchILS(nObjs, ps, p, chWork, &rwy2, 1);
+				if (!nFreq  && pr->nSecondaryIlsId)
+				{	fprintf(fpAFDS, "\n              *** No matching ILS record - assume provided by another layer");
+					fList = 1;
+				}
+			}
+
+			if (nFreq)
+			{	float fILSHdgMag;
+				if (!fMatchedILS)
+				{	fList = 1;
+					if (pr->nSecondaryIlsId)
+					{	fprintf(fpAFDS, " ... ILS ERROR! The ILS ID doesn't match!");
+						chILSidS[0] = 0;
+					}
+
+					else
+						fprintf(fpAFDS, "\n              Secondary ILS ERROR! There is an ILS, but the Runway record does not ID this!!");
+				}
+				sprintf(rwy2.r.chILS, "%.2f", nFreq/100.0);
+				fILSHdgMag = fILSheading - fMagvar;
+				if (fILSHdgMag <= 0.0F) fILSHdgMag += 360.0F;
+				else if (fILSHdgMag > 360.0F) fILSHdgMag -= 360.0F;
+				
+				{	char wk[8];
+					int l = l = sprintf(wk, "%.3f", (double) fILSHdgMag);
+					if (l > 5) wk[5] = 0;
+					else if (wk[l-1] == '0') wk[l-1] = 0;
+					memcpy(rwy2.r.chILSHdg, wk, 6);
+				}
+
+				strncpy(rwy2.r.chILSid, chILSidS, 8);
+				
+				fprintf(fpAFDS, "\n              ");
+
+				//if (fDebug) fprintf(fpAFDS,"OFFSET %08X-%08X:  ", nOffsetILS, nOffsetILS+nSizeILS);
+				
+				fprintf(fpAFDS, "Secondary ILS: %s  %s Hdg: %.1f %s%s%s%s \x22%s\x22",
+					chWork, rwy2.r.chILS, (double) fILSheading,
+						(rwy2.fILSflags & 0x1C) ? ", Flags:" : "",
+					(rwy2.fILSflags & 0x08) ? " GS" : "",
+					(rwy2.fILSflags & 0x10) ? " DME" : "",
+					(rwy2.fILSflags & 0x04) ? " BC" : "",
+					chNameILS);
+				strncpy(rwy2.r.chNameILS, chNameILS, 31);
+				rwy2.r.chNameILS[31] = 0;
+			}
+			//#######################################################
+
+			if (fDebug && !fList) fList = -1;
+			
+			if (!fMSFS && fList && fFoundSome)
+			{	// Log list of ILSs if suspicious!
+				if (fList < 0)
+					fprintf(fpAFDS, "\n              *** List of ILSs ***");
+				else
+					fprintf(fpAFDS, "\n              *** There were ILS matching errors. Here's a list of ILSs:");
+				chWork[0] = 0;
+				MatchILS(nObjs, ps, p, chWork, &rwy1, -1);
+			}
+			
 			if (fOk & 1)AddRunway(&rwy1);
 			if (fOk & 2)AddRunway(&rwy2);
 			prwyPrevious = 0;

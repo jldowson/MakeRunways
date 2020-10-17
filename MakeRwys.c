@@ -6,6 +6,7 @@
 #include <winver.h>
 
 BOOL fMSFS = FALSE;
+char* pLocPak = NULL;
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
@@ -1209,6 +1210,29 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS official scenery in: \n  \x22%s\x22\n", szCfgPath);
+
+			// Load the language file for airport name look-up
+			char szLangPath[MAX_PATH];
+			strcpy(szLangPath, szCfgPath);
+			strcat(szLangPath, "fs-base\\en-US.locPak");
+			if (GetFileAttributes(szLangPath) != INVALID_FILE_ATTRIBUTES)
+			{	HFILE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+				if (h)
+				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
+					pLocPak = malloc(len + 1);
+					if (pLocPak)
+					{	int l;
+						ReadFile(h, pLocPak, len, &l, NULL);
+						pLocPak[len] = 0;
+					}
+					else
+					{	free(pLocPak);
+						pLocPak = 0;
+					}
+					CloseHandle(h);
+				}
+			}
+
 			ProcessMSFSOfficial(szCfgPath, FALSE);
 			// Add the asobo-airport entries to the end of the main list
 			int i = 0;
@@ -1232,8 +1256,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			char* psz = strstr(szPaths[i], "OneStore");
 			if (!psz) psz = strstr(szPaths[i], "Community");
 			if (psz)
-			{
-				strcpy(szTitles[i], psz);
+			{	strcpy(szTitles[i], psz);
 				while (psz = strchr(szTitles[i], '\\'))
 					*psz = ' ';
 			}
@@ -1242,6 +1265,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		}
 
 		fMSFS = TRUE;
+		
 		goto MAINLOOPS;
 	}
 
@@ -1400,7 +1424,11 @@ MAINLOOPS:
 		pft = fopen("t5.csv", "wb");
 		pftbin = fopen("t5.bin", "wb");
 		pfi = fopen("runways.xml", "wb");
-	
+		if (!pfi)
+		{	DWORD err = GetLastError();
+			DebugBreak();
+		}
+
 		if (pf || pf2 || pfi)
 			{	static char *pszILSflags[] = {	"", "B", "G", "BG", "D", "BD", "DG", "BDG" };
 				DWORD dwCurrentICAO = 0;
