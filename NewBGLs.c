@@ -1,6 +1,5 @@
 /* NewBGLs.c
 *******************************************************************************/
-#define DEBUG_THIS_ICAO "EGLL"
 
 #include "MakeRwys.h"
 
@@ -244,9 +243,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 {	BOOL fDelAll = (fAdd <= 0) && !pL->r.chRwy[0] && !pL->fAirport;
 	int nCompLen = fDelAll ? 4 : 8;
 
-	//if (strnicmp(&pL->r.chICAO[0], "S71", 3) == 0)
-	//DebugBreak();
-
 	// First, standardise chICAO 4 chars: ###4692
 	if (pL->r.chICAO[3] == ' ') pL->r.chICAO[3] = 0;
 
@@ -267,7 +263,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 	{	if (fAdd <= 0) return; // deleting when no runways yet!
 		pR = pRlast = pL;
 		ulTotalRwys++;
-		// if (fDebug)	fprintf(fpAFDS,"\n<<<<(4) RwyCtr+1 = %d >>>>\n", ulTotalRwys);
 	}
 										
 	else
@@ -281,7 +276,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 
 			if (fNewAirport && (memcmp(&pRlast->r, &pL->r, 4) == 0))
 			{	ulTotalAPs--;
-				// if (fDebug)	fprintf(fpAFDS,"\n<<<<(c) A/pCtr-1 = %d >>>>\n", ulTotalAPs);
 				fNewAirport = FALSE;	
 			}
 
@@ -309,7 +303,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 					
 					if (pRlast->fDelete && !fNoCtr)
 					{	ulTotalRwys++;
-						// if (fDebug)	fprintf(fpAFDS,"\n<<<<(7) RwyCtr+1 = %d >>>>\n", ulTotalRwys);
 					}
 					pRlast->fDelete = 0;
 					pRlast->fCL = pL->fCL;
@@ -334,7 +327,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 				{	if (!pRlast->fDelete)
 					{	if (!pRlast->fAirport && (pRlast->pGateList == 0) && (pRlast->pTaxiwayList == 0))
 						{	ulTotalRwys--;
-							// if (fDebug)	fprintf(fpAFDS,"\n<<<<(1) RwyCtr-1 = %d >>>>\n", ulTotalRwys);
 						}
 						pRlast->fDelete = fAdd-1;
 					}
@@ -371,7 +363,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 					pRlast = pL;
 					if (!pL->fAirport && (pL->pGateList == 0) && (pL->pTaxiwayList == 0))
 					{	ulTotalRwys++;
-						// if (fDebug)	fprintf(fpAFDS,"\n<<<<(2) RwyCtr+1 = %d >>>>\n", ulTotalRwys);
 					}
 					
 					if (strncmp(pL->r.chRwy, "999", 3) == 0)
@@ -397,7 +388,6 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 					pRlast = pL;
 					if (!pL->fAirport && (pL->pGateList == 0) && (pL->pTaxiwayList == 0))
 					{	ulTotalRwys++;
-						// if (fDebug)	fprintf(fpAFDS,"\n<<<<(3) RwyCtr+1 = %d >>>>\n", ulTotalRwys);
 					}
 					
 					if (strncmp(pL->r.chRwy, "999", 3) == 0)
@@ -489,6 +479,8 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
 	
 	fMatchedILS = FALSE;
 	chNameILS[0] = 0;
+
+	fprintf(fpAFDS, "\nTrying to match %.04s\n", psz); // ###################
 	
 	while ((size > 6) && (size >= pi->nLen))
 	{	int nThisLen = sizeof(NILS);
@@ -578,7 +570,6 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
 
 			if (fInRange && (nMode < 0))
 			{	fprintf(fpAFDS, "\n                 ");
-				//if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pi->wId - nOffsetBase, (int) &pi->wId - nOffsetBase + nThisLen);
 				
 				fprintf(fpAFDS, "ID=%s: Freq %.2f Heading %.1f (%s), Range %.2f, Slope %.2f \x22%s\x22",
 					chId, (double) (pi->nFreq / 1000000.0),
@@ -644,13 +635,6 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 
 		if (fUserAbort) return 0;
 		
-		/**************************************************
-		if (fDebug)	
-		{	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
-			fprintf(fpAFDS, "\nFindStart: size left: %d, nLen=%d, wId=%04x\n", size, pa->nLen, pa->wId);
-		}
-		//*************************************************/
-
 		if (pa->wId == OBJTYPE_START)
 		{	// Start record found
 			NSTART *ps = (NSTART *) pa;
@@ -2245,17 +2229,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 	{	int nThisLen = pa->nLen;
 		if (fUserAbort) return;
 
-		/*******************************************
-		if (fDebug)	
-		{	int nGat = 0;
-			if (pLastSetGateList)
-				nGat = (WORD) (*pLastSetGateList & 0xffff);
-			fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
-			fprintf(fpAFDS, "\nNAPT: size left: %d, nLen=%d, wId=%04x, Gatectr=%d\n",
-				size, pa->nLen, pa->wId, nGat);
-		}
-		//******************************************/
-
 		if ((pa->wId == OBJTYPE_AIRPORT) || (pa->wId == OBJTYPE_NEWAIRPORT) ||
 				(pa->wId == OBJTYPE_NEWNEWAIRPORT) || (pa->wId == OBJTYPE_AIRPORT_MSFS))
 		{	// Airport record found
@@ -2279,13 +2252,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			else if (pa->wId == OBJTYPE_AIRPORT_MSFS) nThisLen += 12;
 
 			if (!fDeletionsPass)
-			{
-				#ifdef DEBUG_THIS_ICAO
-					if (strnicmp(DEBUG_THIS_ICAO, chICAO,4) == 0)
-						fDebugThisEntry = TRUE;
-				#endif
-
-				if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
+			{	if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
 				
 				fprintf(fpAFDS, "\nAirport %s :", chICAO);
 				
@@ -2300,9 +2267,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				if (pR)
 				{	RWYLIST* pRL = pR;
 					while (pRL)
-					{	if (!pRL->fDelete && pRL->fAirport && (strnicmp(chICAO, pRL->r.chICAO, 4) == 0))
+					{	if (!pRL->fDelete && (strnicmp(chICAO, pRL->r.chICAO, 4) == 0))
 						{	if (pRL->r.chILSid[0])
-								FindILSdetails(nObjs, ps, p, pRL->r.chILSid, pRL, 1);
+							{	FindILSdetails(nObjs, ps, p, pRL->r.chILSid, pRL, 1);
+							}
 						}
 						pRL = pRL->pTo;
 					}
@@ -2376,8 +2344,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				pNTpnt = 0;
 				pTname = 0;
 	
-				// if (fDebug)	fprintf(fpAFDS,"\n<<<<(b) A/pCtr+1 = %d >>>>\n", ulTotalAPs);
-				
 				fprintf(fpAFDS, "          in file: %s\n\n",szCurrentFilePath);
 
 				memset(&ap, 0, sizeof(RWYLIST));
@@ -2528,7 +2494,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			chILSidP[0] = chILSidS[0] = 0;
 				
 			fprintf(fpAFDS, "          ");
-			//if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
 			DecodeRwy(pr->bStartNumber, pr->bStartDesignator, chWork2, 0, sizeof(chWork2));
 			rwy1.r.chRwy[0] = '0' + (char) (pr->bStartNumber / 100);
 			rwy1.r.chRwy[1] = '0' + (char) ((pr->bStartNumber % 100) / 10);
@@ -2605,7 +2570,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					}
 					
 					if (pa->wId == OBJTYPE_RUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY)), nThisLen - sizeof(NRWY));
+					{	// if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY)), nThisLen - sizeof(NRWY));
 						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 12);
@@ -2613,7 +2578,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					}
 
 					else if (pa->wId == OBJTYPE_NEWRUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16);
+					{	// if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16);
 						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY) + 16), nThisLen - sizeof(NRWY) - 16, 12);
@@ -2621,7 +2586,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					}
 	
 					else if (pa->wId == OBJTYPE_MSFSRUNWAY)
-					{	if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN);
+					{	// if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN);
 						FindOffThresh(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, -5);
 						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 11);
 						FindVASI(&rwy1, (NAPT*)((BYTE*)pa + OBJTYPE_MSFSRUNWAY_LEN), nThisLen - OBJTYPE_MSFSRUNWAY_LEN, 12);
@@ -2630,7 +2595,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 	
 					else
 					{	//******************** THIS METHOD DOESN'T WORK ON OLDER BGLs. WHY? **************
-						if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + pa->nLen), nThisLen - pa->nLen);
+						// if (fDebug) DebugRwyAdditions((NAPT*)((BYTE*)pa + pa->nLen), nThisLen - pa->nLen);
 						FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 5);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 11);
 						FindVASI(&rwy1, (NAPT *) ((BYTE *) pa + pa->nLen), nThisLen - pa->nLen, 12);
@@ -2780,6 +2745,11 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			pNextAirportName += strlen(pNextAirportName) + 1;
 		}
 		//****************************************************************************/
+
+		else if (fMSFS && !fDeletionsPass && id && (pa->wId == OBJTYPE_VOR))
+		{	// Only applicable to MSFS -- check for ILS details
+DebugBreak();
+		}
 
 		else if (!fDeletionsPass && id && (pa->wId == OBJTYPE_APCOMM))
 		{	// Airport comms record found
@@ -2941,9 +2911,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				if (pg2) pg2 = (NGATE2 *) pg;
 				if (pg3) pg3 = (NGATE3 *) pg;
 			}
-
-			//if (strnicmp(&chICAO[0], "S71", 3) == 0)
-			//	fprintf(fpAFDS, "### DEBUGGING S71: %d gates", wCtr);	
 		}
 		
 		else if (!fDeletionsPass && id && ((pa->wId == OBJTYPE_TAXIPATH) ||
@@ -3167,6 +3134,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			wTpath = wTpnt = wTname = 0;
 		}
 
+ABORTHERE:
 		size -= nThisLen;
 		pa =  (NAPT *) ((BYTE *) pa + nThisLen);
 		if (nThisLen == 0)

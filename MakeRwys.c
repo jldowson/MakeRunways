@@ -5,7 +5,7 @@
 #include "shfolder.h"
 #include <winver.h>
 
-BOOL fMSFS = FALSE;
+BOOL fMSFS = FALSE, fLocal = FALSE;
 char* pLocPak = NULL;
 
 #ifdef _DEBUG
@@ -1116,6 +1116,48 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 }
 
 /******************************************************************************
+		 CompleteTables (MSFS)
+******************************************************************************/
+
+void CompleteTables(void)
+{
+	int i = 0;
+	while (i < nArea)
+	{
+		nAreas[i] = i + 1;
+		bActive[i] = 0xff;
+		int j = strlen(szPaths[i]);
+		szPaths[i][--j] = 0; // Dispense with last backslash
+		char* psz = strstr(szPaths[i], "OneStore");
+		if (psz) psz += 9;
+		else
+		{
+			psz = strstr(szPaths[i], "Steam");
+			if (psz) psz += 6;
+			else
+			{
+				psz = strstr(szPaths[i], "Community");
+				if (psz) psz += 10;
+			}
+		}
+
+		if (psz)
+		{
+			strcpy(szTitles[i], psz);
+			psz = strchr(szTitles[i], '\\');
+			if (psz && isdigit(psz[1]))
+			{
+				while (psz = strchr(szTitles[i], '\\'))
+					*psz = ' ';
+			}
+			else if (psz) *psz = 0;
+		}
+
+		i++;
+	}
+}
+
+/******************************************************************************
          MainRoutine
 ******************************************************************************/
 
@@ -1193,7 +1235,17 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
 	}
 
-	if ((fFSX < 0) && fDoMSFS)
+	if ((fFSX < 0) && fLocal)
+	{	fMSFS = TRUE;
+		GetModuleFileName(NULL, szCfgPath, MAX_PATH);
+		char* psz = strrchr(szCfgPath, '\\');
+		if (psz) psz[1] = 0;
+		ProcessMSFSCommunity(szCfgPath);
+		CompleteTables();
+		goto MAINLOOPS;
+	}
+
+	else if ((fFSX < 0) && fDoMSFS)
 	{	// See if it is MSFS, in MS Store location
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
 		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
@@ -1247,25 +1299,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		}
 
 		// complete the tables (with fiction at present)
-		int i = 0;
-		while (i < nArea)
-		{	nAreas[i] = i + 1;
-			bActive[i] = 0xff;
-			int j = strlen(szPaths[i]);
-			szPaths[i][--j] = 0; // Dispense with last backslash
-			char* psz = strstr(szPaths[i], "OneStore");
-			if (!psz) psz = strstr(szPaths[i], "Community");
-			if (psz)
-			{	strcpy(szTitles[i], psz);
-				while (psz = strchr(szTitles[i], '\\'))
-					*psz = ' ';
-			}
-
-			i++;
-		}
+		CompleteTables();
 
 		fMSFS = TRUE;
-		
 		goto MAINLOOPS;
 	}
 
@@ -1937,16 +1973,23 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 			pch += 4;
 		}
 
-		else if (_strnicmp(&pch[1], "SSNG", 5) == 0)
+		else if (_strnicmp(&pch[1], "SSNG", 4) == 0)
 		{	fNoLoadLorby = TRUE;
 			pch += 5;
 		}
 
-		else if (_strnicmp(&pch[1], "OLDNODRAW", 5) == 0)
+		else if (_strnicmp(&pch[1], "OLDNODRAW", 9) == 0)
 
 		{
 			fNoDrawHoldConvert = FALSE;
 			pch += 10;
+		}
+
+		else if (_strnicmp(&pch[1], "LOCAL", 5) == 0)
+
+		{
+			fLocal = TRUE;
+			pch += 6;
 		}
 
 		else if (pch[1] == '>')
