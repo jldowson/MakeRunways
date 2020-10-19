@@ -6,12 +6,12 @@
 #include <winver.h>
 
 BOOL fMSFS = FALSE, fLocal = FALSE;
-char* pLocPak = NULL;
+char *pLocPak = NULL, *pContent = NULL;
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
 #else
-	BOOL fDoMSFS = FALSE;
+	BOOL fDoMSFS = TRUE;
 #endif
 
 int errnum = 0;
@@ -939,7 +939,8 @@ void ScanSceneryArea(char *pszPath)
 		{	char szFile1[MAX_PATH], szFile2[MAX_PATH], szFile3[MAX_PATH];
 			szFile2[0] = szFile3[0] = 0;
 			strcpy(&szParam[fpos], find.cFileName);
-			++ulTotalBGLs;
+			if (!fDeletionsPass)
+				++ulTotalBGLs;
 
 			strcpy(szFile1, szParam);
 			if (fMSFS)
@@ -976,7 +977,8 @@ void ScanSceneryArea(char *pszPath)
 				// See if file contains AFDs:
 				if ((fFS9 >= 0) && (fread(&nbglhdr, 1, sizeof(NBGLHDR), fpIn) >= 
 							(sizeof(NBGLHDR) - ((NSECTS_PER_FILE - 1) * sizeof(NSECTS)))))
-				{	ulTotalBytes += sizeof(NBGLHDR);
+				{	if (!fDeletionsPass)
+						ulTotalBytes += sizeof(NBGLHDR);
 					if (nbglhdr.wStamp == 0x0201)
 					{	// New BGL format for FS2004?
 						strcpy(szCurrentFilePath, szParam);
@@ -1032,7 +1034,6 @@ int nAsobo = 0;
 ProcessMSFSCommunity(char* pPath)
 {	char szPath[MAX_PATH];
 	HANDLE hFind;
-	HANDLE hFile;
 	WIN32_FIND_DATA fd;
 
 	strcpy(szPath, pPath);
@@ -1075,7 +1076,6 @@ ProcessMSFSCommunity(char* pPath)
 ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 {	char szPath[MAX_PATH];
 	HANDLE hFind;
-	HANDLE hFile;
 	WIN32_FIND_DATA fd;
 	
 	strcpy(szPath, pPath);
@@ -1101,11 +1101,11 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 	{	// Check for directory
 		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
 				strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
-				(strnicmp(fd.cFileName, "asobo", 5) || (strnicmp(fd.cFileName, "asobo-airport", 13) == 0)))
+				(_strnicmp(fd.cFileName, "asobo", 5) || (_strnicmp(fd.cFileName, "asobo-airport", 13) == 0)))
 		{	strcpy(szPath, pPath);
 			strcat(szPath, fd.cFileName);
 			strcat(szPath, "\\");
-			ProcessMSFSOfficial(szPath, strstr(szPath, "asobo-airport"));
+			ProcessMSFSOfficial(szPath, strstr(szPath, "asobo-airport") != 0);
 		}
 	
 		if (!FindNextFile(hFind, (WIN32_FIND_DATA*) &fd))
@@ -1127,34 +1127,45 @@ void CompleteTables(void)
 		nAreas[i] = i + 1;
 		bActive[i] = 0xff;
 		int j = strlen(szPaths[i]);
+		BOOL fCommunity = FALSE;
 		szPaths[i][--j] = 0; // Dispense with last backslash
 		char* psz = strstr(szPaths[i], "OneStore");
 		if (psz) psz += 9;
 		else
-		{
-			psz = strstr(szPaths[i], "Steam");
+		{	psz = strstr(szPaths[i], "Steam");
 			if (psz) psz += 6;
 			else
-			{
-				psz = strstr(szPaths[i], "Community");
-				if (psz) psz += 10;
+			{	psz = strstr(szPaths[i], "Community");
+				if (psz)
+				{	psz += 10;
+					fCommunity = TRUE;
+				}
 			}
 		}
 
 		if (psz)
-		{
-			strcpy(szTitles[i], psz);
-			psz = strchr(szTitles[i], '\\');
-			if (psz && isdigit(psz[1]))
+		{	strcpy(szTitles[i], psz);
+			psz = (strchr(szTitles[i], '\\'));
+			if ((_strnicmp(szTitles[i], "Asobo", 5) == 0) || fCommunity)
+				*psz = 0;
+			else
 			{
-				while (psz = strchr(szTitles[i], '\\'))
-					*psz = ' ';
+				if (psz && (_strnicmp(++psz, "Scenery", 7) == 0))
+					psz += 7;
+				if (psz && !isdigit(psz[1]) && _strnicmp(&psz[1], "Base", 4) &&
+					_strnicmp(&psz[1], "World", 5))
+					*psz = 0;
 			}
-			else if (psz) *psz = 0;
+			while (psz = strchr(szTitles[i], '\\'))
+				*psz = ' ';
 		}
 
 		i++;
 	}
+
+	// ####################################### TO DO ######################################
+	// Now need to loop through all entries in pContent, looking for 'active="false"'.
+	// For each found search out table for match, and set active false.
 }
 
 /******************************************************************************
@@ -1235,6 +1246,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
 	}
 
+	// fprintf(fpAFDS, "\nfFSX = %d, fDoMSFS = %d\n", fFSX, fDoMSFS);
+
 	if ((fFSX < 0) && fLocal)
 	{	fMSFS = TRUE;
 		GetModuleFileName(NULL, szCfgPath, MAX_PATH);
@@ -1247,17 +1260,78 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 	else if ((fFSX < 0) && fDoMSFS)
 	{	// See if it is MSFS, in MS Store location
+		char szCopyPath[MAX_PATH];
+
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
-		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
+		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache");
+		int n = strlen(szCfgPath);
+
+		strcpy(&szCfgPath[n], "\\UserCfg.opt");
+		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
+		{	// try Steam
+			strcpy(szCfgPath, getenv("APPDATA"));
+			strcat(szCfgPath, "\\Microsoft Flight Simulator");
+			n = strlen(szCfgPath);
+			strcpy(&szCfgPath[n], "\\UserCfg.opt");
+		}
+
+		// Get content list (for disable options)
+		strcpy(szCopyPath, szCfgPath);
+		strcpy(&szCopyPath[n], "\\content.xml");
+		
+		HANDLE h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+		if (h)
+		{	DWORD lenHi, len = GetFileSize((HANDLE) h, &lenHi);
+			char* pContent = malloc(len + 1);
+			int l;
+			ReadFile((HANDLE) h, pContent, len, &l, NULL);
+			pContent[len] = 0;
+			CloseHandle((HANDLE) h);
+		}
+
+		h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+		if (h)
+		{	fOk = FALSE;
+			int lenHi, len = GetFileSize(h, &lenHi);
+			char* pCfg = malloc(len + 1);
+			
+			if (pCfg)
+			{
+				int l;
+				ReadFile(h, pCfg, len, &l, NULL);
+				pCfg[len] = 0;
+
+				char* psz = strstr(pCfg, "InstalledPackagesPath");
+				if (psz)
+				{
+					psz = strchr(psz, '\x22');
+					if (psz)
+					{
+						strcpy(szCfgPath, &psz[1]);
+						psz = strchr(szCfgPath, '\x22');
+						if (psz) *psz = 0;
+						fOk = TRUE;
+					}
+				}
+				
+				free(pCfg);
+			}
+
+			CloseHandle(h);
+		}
+		
+		if (!fOk)
+		{	//Make assumption if "proper" method fails:
+			strcpy(szCfgPath, getenv("LOCALAPPDATA"));
+			strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
+		}
+
 		int fsPathLen = strlen(szCfgPath);
-		strcat(szCfgPath, "Official\\OneStore\\");
+		strcpy(&szCfgPath[fsPathLen], "\\Official\\OneStore\\");
 		
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// Not MS Store, try Steam version:
-			strcpy(szCfgPath, getenv("APPDATA"));
-			strcat(szCfgPath, "\\Microsoft Flight Simulator\\Packages\\");
-			fsPathLen = strlen(szCfgPath);
-			strcat(szCfgPath, "Official\\OneStore\\");
+			strcpy(&szCfgPath[fsPathLen], "\\Official\\Steam\\");
 		}
 		
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
@@ -1268,7 +1342,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			strcpy(szLangPath, szCfgPath);
 			strcat(szLangPath, "fs-base\\en-US.locPak");
 			if (GetFileAttributes(szLangPath) != INVALID_FILE_ATTRIBUTES)
-			{	HFILE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+			{	HANDLE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 				if (h)
 				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
 					pLocPak = malloc(len + 1);
@@ -1292,7 +1366,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				strcpy(szPaths[nArea++], szAsoboPaths[i++]);
 		}
 		
-		strcpy(&szCfgPath[fsPathLen], "Community\\");
+		strcpy(&szCfgPath[fsPathLen], "\\Community\\");
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS community scenery in: \n  \x22%s\x22\n", szCfgPath);
 			ProcessMSFSCommunity(szCfgPath);
@@ -1674,7 +1748,7 @@ MAINLOOPS:
 							NGATE *pg = (NGATE *) ((BYTE *) p->pGateList + sizeof(NGATEHDR));
 							NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 							NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
-							if (pgh->wId == OBJTYPE_MSFSTAXIPARK) pg2 = pg;
+							if (pgh->wId == OBJTYPE_MSFSTAXIPARK) pg2 = (NGATE2 *) pg;
 
 							while (w < wCtr)
 							{	LOCATION locg;
@@ -1829,6 +1903,9 @@ MAINLOOPS:
 	MakeCommsFile();
 	if (fProcessTA)	UpdateTransitionAlts();
 	fclose(fpAFDS);
+
+	if (pLocPak) free(pLocPak);
+	if (pContent) free(pContent);
 
 	fWritingFiles = FALSE;
 	PostMessage(hWnd, WM_USER, 0, fOk);
