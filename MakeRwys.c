@@ -92,7 +92,7 @@ HWND hWnd;
 BOOL fUserAbort = 0, fWritingFiles = FALSE, fNewAirport = FALSE, fQuiet = FALSE;
 BOOL fNoLoadLorby = FALSE;
 int fFS9 = 0;
-DWORD ulTotalAPs = 0, ulTotalRwys = 0;
+DWORD ulTotalAPs = 0, ulTotalRwys = 0, ulTotalRwys2 = 0;
 DWORD ulTotalBGLs = 0, ulTotalBytes = 0;
 
 BYTE chASCII[257] =
@@ -1571,6 +1571,7 @@ MAINLOOPS:
 		}
 
 		p = pR;
+		ulTotalRwys2 = 0;
 		pf = fopen("r4.csv", "wb");
 		pfbin = fopen("r5.bin","wb");
 		pf2 = fopen("r5.csv", "wb");
@@ -1716,6 +1717,7 @@ MAINLOOPS:
 
 								fprintf(pfi, "<Runway id=\"%.2s%s\">\x0d\x0a<Len>%d</Len>\x0d\x0a<Hdg>%.3f</Hdg>\x0d\x0a",
 										&p->r.chRwy[1], pszDesig[p->r.chRwy[3] & 7], p->r.uLen, (double) p->fHdg);
+								ulTotalRwys2++;
 								fprintf(pfi, "<Def>%s</Def>\x0d\x0a<ILSFreq>%s</ILSFreq>\x0d\x0a<ILSHdg>%s</ILSHdg>\x0d\x0a<ILSid>%s</ILSid>\x0d\x0a<ILSslope>%.2f</ILSslope>\x0d\x0a",
 										(p->r.chSurfNew > 24) ? szRwySurf[(p->r.chSurf > 12) ? 0 : p->r.chSurf] :
                                         szNRwySurf[p->r.chSurfNew], p->r.chILS,	p->r.chILSHdg, p->r.chILSid, p->r.fILSslope);
@@ -1950,6 +1952,9 @@ MAINLOOPS:
 	fclose(fpAFDS);
 
 	if (pLocPak) free(pLocPak);
+
+	ulTotalRwys = ulTotalRwys2;
+	PostMessage(hWnd, WM_USER, 1, fOk);
 	
 	fWritingFiles = FALSE;
 	PostMessage(hWnd, WM_USER, 0, fOk);
