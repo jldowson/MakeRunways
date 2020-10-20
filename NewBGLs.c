@@ -313,7 +313,9 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 						pRlast->pTaxiwayList = pL->pTaxiwayList;
 					pRlast->fILSflags = pL->fILSflags;
 
-					pRlast->pPathName = pL->pPathName;
+					if (!fMSFS || !(pRlast->pPathName && (strstr(pL->pPathName, "fs-base-nav"))))
+						// Retain previous pathname if new one only MSFS NAV additions
+						pRlast->pPathName = pL->pPathName;
 					pRlast->pSceneryName = pL->pSceneryName;
 					if (strncmp(pL->r.chRwy, "999", 3) == 0)
 						prwyPrevious = pRlast;
@@ -2748,11 +2750,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			pNextAirportName += strlen(pNextAirportName) + 1;
 		}
 		//****************************************************************************/
-
-		else if (fMSFS && !fDeletionsPass && id && (pa->wId == OBJTYPE_VOR))
-		{	// Only applicable to MSFS -- check for ILS details
-DebugBreak();
-		}
 
 		else if (!fDeletionsPass && id && (pa->wId == OBJTYPE_APCOMM))
 		{	// Airport comms record found

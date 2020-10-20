@@ -1121,6 +1121,7 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 
 void CompleteTables(void)
 {
+	char* psz;
 	int i = 0;
 	while (i < nArea)
 	{
@@ -1129,22 +1130,26 @@ void CompleteTables(void)
 		int j = strlen(szPaths[i]);
 		BOOL fCommunity = FALSE;
 		szPaths[i][--j] = 0; // Dispense with last backslash
-		char* psz = strstr(szPaths[i], "OneStore");
+		psz = strstr(szPaths[i], "OneStore");
 		if (psz) psz += 9;
 		else
-		{	psz = strstr(szPaths[i], "Steam");
+		{
+			psz = strstr(szPaths[i], "Steam");
 			if (psz) psz += 6;
 			else
-			{	psz = strstr(szPaths[i], "Community");
+			{
+				psz = strstr(szPaths[i], "Community");
 				if (psz)
-				{	psz += 10;
+				{
+					psz += 10;
 					fCommunity = TRUE;
 				}
 			}
 		}
 
 		if (psz)
-		{	strcpy(szTitles[i], psz);
+		{
+			strcpy(szTitles[i], psz);
 			psz = (strchr(szTitles[i], '\\'));
 			if ((_strnicmp(szTitles[i], "Asobo", 5) == 0) || fCommunity)
 				*psz = 0;
@@ -1165,7 +1170,47 @@ void CompleteTables(void)
 
 	// ####################################### TO DO ######################################
 	// Now need to loop through all entries in pContent, looking for 'active="false"'.
-	// For each found search out table for match, and set active false.
+	psz = pContent;
+	while (psz)
+	{	char* psz2 = strstr(psz, "<Package");
+		if (psz2) psz = strstr(psz2, "\"false\"");
+		else psz = 0;
+		
+		if (psz)
+		{	// For each found search out table for match, and set active false.
+			psz2 = strchr(psz2, '\x22');
+			if (psz2)
+			{
+				char* psz3 = strchr(++psz2, '\x22');
+				if (psz3)
+				{
+					i = 0;
+					*psz3 = 0;
+					
+					while (i < nArea)
+					{
+						if (strstr(szTitles[i], psz2))
+						{
+							bActive[i] = 0;
+							if (strcmp(psz2, "fs-base"))
+								break;
+						}
+					
+						i++;
+					}
+				}
+			}
+
+			psz += 6;
+		}
+	}
+
+	if (pContent)
+	{
+		free(pContent);
+		pContent = 0;
+	}
+
 }
 
 /******************************************************************************
@@ -1200,7 +1245,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 4.92 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1279,11 +1324,11 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		strcpy(szCopyPath, szCfgPath);
 		strcpy(&szCopyPath[n], "\\content.xml");
 		
-		HANDLE h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+		HANDLE h = CreateFile(szCopyPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
 		{	DWORD lenHi, len = GetFileSize((HANDLE) h, &lenHi);
-			char* pContent = malloc(len + 1);
 			int l;
+			pContent = malloc(len + 1);
 			ReadFile((HANDLE) h, pContent, len, &l, NULL);
 			pContent[len] = 0;
 			CloseHandle((HANDLE) h);
@@ -1905,8 +1950,7 @@ MAINLOOPS:
 	fclose(fpAFDS);
 
 	if (pLocPak) free(pLocPak);
-	if (pContent) free(pContent);
-
+	
 	fWritingFiles = FALSE;
 	PostMessage(hWnd, WM_USER, 0, fOk);
 	if (fQuiet) SendMessage(hWnd, WM_CLOSE, 0, 0);
@@ -1926,7 +1970,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 4.92");
+			SetWindowText(hDlg, "Make Runways: Version 5.00BETA");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
