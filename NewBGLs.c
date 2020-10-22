@@ -316,7 +316,9 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 					if (!fMSFS || !(pRlast->pPathName && (strstr(pL->pPathName, "fs-base-nav"))))
 						// Retain previous pathname if new one only MSFS NAV additions
 						pRlast->pPathName = pL->pPathName;
-					pRlast->pSceneryName = pL->pSceneryName;
+					if (!fMSFS || !(pRlast->pSceneryName && (strstr(pL->pSceneryName, "fs-base-nav"))))
+						// Retain previous title if new one only MSFS NAV additions
+						pRlast->pSceneryName = pL->pSceneryName;
 					if (strncmp(pL->r.chRwy, "999", 3) == 0)
 						prwyPrevious = pRlast;
 					free(pL);
@@ -2180,7 +2182,7 @@ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, 
 
 void GetNameString(char* p)
 {	char* psz;
-	if (*p == 0)
+	if ((*p == 0) || strnicmp(p, "TT:AIRPORT", 10))
 		return;
 	psz = strstr(pLocPak, &p[3]);
 	if (psz)
