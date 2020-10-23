@@ -1828,7 +1828,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 		 NewMakeTaxiwayList3 for MSFS
 ******************************************************************************/
 
-TWHDR* NewMakeTaxiwayList3(NEWTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WORD wN, WORD wP)
+TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WORD wN, WORD wP)
 {
 	WORD wo = wN, w2;
 	int wp1, wp2;
@@ -3123,7 +3123,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			{	rwy1.pTaxiwayList = 
 					fNewTaxiPath ?
 					(fNewTaxiPath == -1) ?
-						NewMakeTaxiwayList3((NEWTAXIPT *) pTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
+						NewMakeTaxiwayList3(pTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
 						NewMakeTaxiwayList(pTpnt, pTname, pNTpath, wTpnt, wTname, wTpath) :
 						MakeTaxiwayList(pTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
 			}
