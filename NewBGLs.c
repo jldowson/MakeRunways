@@ -2189,10 +2189,18 @@ void GetNameString(char* p)
 	{	char* psz2;
 		psz = strstr(psz, ": \x22");
 		if (psz)
-		{	psz += 3;
+		{	int len;
+			psz += 3;
 			psz2 = strchr(psz, '\x22');
 			strncpy(p, psz, (int)(psz2 - psz));
 			p[psz2 - psz] = 0;
+
+			// Remove all \ characters:
+			psz = p;
+			while (psz = strchr(psz, '\\'))
+				memmove(psz, &psz[1], strlen(psz));
+			if (p[strlen(p) - 1] == '/')
+				p[strlen(p) - 1] = 0;
 		}
 	}
 	else p[0] = 0;

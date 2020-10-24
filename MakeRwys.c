@@ -1244,7 +1244,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA3 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA4 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1974,7 +1974,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.00BETA3");
+			SetWindowText(hDlg, "Make Runways: Version 5.00BETA4");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
