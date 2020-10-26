@@ -1171,26 +1171,31 @@ void CompleteTables(void)
 	// Now loop through all entries in pContent, looking for 'active="false"'.
 	psz = pContent;
 	while (psz)
-	{	char* psz2 = strstr(psz, "<Package");
-		if (psz2) psz = strstr(psz2, "\"false\"");
-		else psz = 0;
+	{	char* psz3, *psz2 = strstr(psz, "<Package");
+		BOOL fDisabled = FALSE;
 		
-		if (psz)
+		if (!psz2)
+			break;
+		
+		psz3 = strstr(psz2, "/>");
+		if (psz3)
+		{	*psz3 = 0;
+			fDisabled = strstr(psz2, "\"false\"");
+			*psz3 = '/';
+		}
+		
+		if (fDisabled)
 		{	// For each found search out table for match, and set active false.
 			psz2 = strchr(psz2, '\x22');
 			if (psz2)
-			{
-				char* psz3 = strchr(++psz2, '\x22');
+			{	psz3 = strchr(++psz2, '\x22');
 				if (psz3)
-				{
-					i = 0;
+				{	i = 0;
 					*psz3 = 0;
 					
 					while (i < nArea)
-					{
-						if (strstr(szTitles[i], psz2))
-						{
-							bActive[i] = 0;
+					{	if (strstr(szTitles[i], psz2))
+						{	bActive[i] = 0;
 							if (strcmp(psz2, "fs-base"))
 								break;
 						}
@@ -1199,9 +1204,9 @@ void CompleteTables(void)
 					}
 				}
 			}
-
-			psz += 6;
 		}
+
+		psz += 6;
 	}
 
 	if (pContent)
@@ -1244,7 +1249,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA4 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA5 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1974,7 +1979,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.00BETA4");
+			SetWindowText(hDlg, "Make Runways: Version 5.00BETA5");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
