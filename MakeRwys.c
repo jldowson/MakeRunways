@@ -7,6 +7,7 @@
 
 BOOL fMSFS = FALSE, fLocal = FALSE;
 char *pLocPak = NULL, *pContent = NULL;
+int nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
@@ -24,11 +25,11 @@ extern char *pszGateType[];
 extern int fDeletionsPass, nMinRunwayLen;
 extern BOOL fIncludeWater, fMarkJetways;
 void UpdateTransitionAlts(void);
-char *pszSimName[8] = {
+char *pszSimName[9] = {
 	"FS9", "FSX", "FSX-SE", "Prepar3D", "Prepar3D v2",
-	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5" };
-	char *pPathName = 0;
-	char *pSceneryName = 0;
+	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "MSFS" };
+char *pPathName = 0;
+char *pSceneryName = 0;
 HINSTANCE hInstance;
 
 /******************************************************************************
@@ -655,6 +656,8 @@ int SetSceneryCfgPath(char *psz, int nVers)
 	WIN32_FIND_DATA fd;
 	BOOL fSearching = FALSE, ftm = TRUE, fOkay = FALSE;
 	int len2;
+
+	nVersion = nVers;
 	
 	if (nVers >= 4)
 	{	// For Prepar3D v3 - v5, see if AddonOrganizer is available
@@ -805,6 +808,7 @@ int SetSceneryCfgPath(char *psz, int nVers)
 void StartXML(FILE *pfi)
 {	fprintf(pfi,"<?xml version=\"1.0\"?>\x0d\x0a");
 	fprintf(pfi,"<data>\x0d\x0a");	
+	fprintf(pfi, "<SimVersion>%s</SimVersion>\x0d\x0a", pszSimName[nVersion + 1]);
 }
 
 /******************************************************************************
@@ -1180,7 +1184,7 @@ void CompleteTables(void)
 		psz3 = strstr(psz2, "/>");
 		if (psz3)
 		{	*psz3 = 0;
-			fDisabled = strstr(psz2, "\"false\"");
+			fDisabled = (strstr(psz2, "\"false\"") != NULL);
 			*psz3 = '/';
 		}
 		
@@ -1249,7 +1253,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA5 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.00BETA6 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1299,6 +1303,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 	if ((fFSX < 0) && fLocal)
 	{	fMSFS = TRUE;
+		nVersion = 7;
 		GetModuleFileName(NULL, szCfgPath, MAX_PATH);
 		char* psz = strrchr(szCfgPath, '\\');
 		if (psz) psz[1] = 0;
@@ -1425,6 +1430,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		CompleteTables();
 
 		fMSFS = TRUE;
+		nVersion = 7;
+		fprintf(fpAFDS, "Reading MSFS scenery:\n");
 		goto MAINLOOPS;
 	}
 
@@ -1979,7 +1986,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.00BETA5");
+			SetWindowText(hDlg, "Make Runways: Version 5.00BETA6");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
