@@ -2182,15 +2182,14 @@ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, 
 
 void GetNameString(char* p)
 {	char* psz;
-	if ((*p == 0) || strnicmp(p, "TT:AIRPORT", 10))
+	if ((*p == 0) || _strnicmp(p, "TT:AIRPORT", 10))
 		return;
 	psz = strstr(pLocPak, &p[3]);
 	if (psz)
 	{	char* psz2;
 		psz = strstr(psz, ": \x22");
 		if (psz)
-		{	int len;
-			psz += 3;
+		{	psz += 3;
 			psz2 = strchr(psz, '\x22');
 			strncpy(p, psz, (int)(psz2 - psz));
 			p[psz2 - psz] = 0;
@@ -3123,7 +3122,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			{	rwy1.pTaxiwayList = 
 					fNewTaxiPath ?
 					(fNewTaxiPath == -1) ?
-						NewMakeTaxiwayList3(pNTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
+						NewMakeTaxiwayList3((NTAXIPT *) pNTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
 						NewMakeTaxiwayList2(pNTpnt, pTname, pNTpath2, wTpnt, wTname, wTpath) :
 						MakeTaxiwayList2(pNTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
 			}
