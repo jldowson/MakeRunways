@@ -2211,7 +2211,7 @@ void GetNameString(char* p)
 
 void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pRegion)
 {	DWORD id = 0;
-	char chICAO[5], chILSidP[8], chILSidS[8];
+	char chICAO[6], chILSidP[8], chILSidS[8];
 	char chWork[48], chWork2[16];
 	LOCATION loc;
 	float fMagvar, fHeading, fapLat, fapLon;
@@ -2496,7 +2496,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NRWY *pr = (NRWY *) pa;
 			int nFreq = 0, fOk = 0, fList = 0;
 			ANGLE Rlat, Rlong;
-			WORD wSurf;
+			WORD wSurf = 0;
 
 			nThisLen = pr->nLen;
 
@@ -2546,7 +2546,45 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			rwy1.fLat = rwy2.fLat = Rlat.fangle;
 			rwy1.fLong = rwy2.fLong = Rlong.fangle;
 
-			wSurf = pr->wSurface & 0x7f; // remove transparency flag ### 240719
+			if ((pa->wId == OBJTYPE_MSFSRUNWAY) && pMaterials)
+			{	// Form character equivalent of surface GUID
+				char chGUID[64];
+				MSFSRUNWAY* pr2 = (MSFSRUNWAY*) pr;
+				sprintf(chGUID, "{%08X-%04X-%04X-%02X%02X-%02X%02X%02X%02X%02X%02X}",
+					*((DWORD *)&pr2->guidSurface[0]),
+					*((WORD *)&pr2->guidSurface[4]),
+					*((WORD *)&pr2->guidSurface[6]),
+					pr2->guidSurface[8], pr2->guidSurface[9],
+					pr2->guidSurface[10], pr2->guidSurface[11], pr2->guidSurface[12],
+					pr2->guidSurface[13], pr2->guidSurface[14], pr2->guidSurface[15]);
+				
+				// find GUID is Materials file:
+				char* psz = strstr(pMaterials, chGUID);
+				if (psz)
+				{
+					char *psz2 = strchr(psz, '>'); // End of entry
+					psz = strstr(psz, "SurfaceType=");
+					if (psz && psz2 && (psz < psz2))
+					{
+						char szName[32];
+						strncpy(szName, &psz[13], 31);
+						psz = strchr(szName, '\x22');
+						if (psz)
+						{
+							*psz = 0;
+							for (int x = 0; x < 25; x++)
+							{
+								if (_stricmp(szNRwySurf[x], szName) == 0)
+								{
+									wSurf = x;
+									break;
+								}
+							}
+						}
+					}
+				}
+			}
+			else wSurf = pr->wSurface & 0x7f; // remove transparency flag ### 240719
 			rwy1.r.chSurfNew = rwy2.r.chSurfNew = wSurf > 23 ? 24 : wSurf;
 			rwy1.r.chSurf = rwy2.r.chSurf = chOldSurf[rwy1.r.chSurfNew];
 

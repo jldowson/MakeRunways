@@ -6,7 +6,7 @@
 #include <winver.h>
 
 BOOL fMSFS = FALSE, fLocal = FALSE;
-char *pLocPak = NULL, *pContent = NULL;
+char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
 int nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
 
 #ifdef _DEBUG
@@ -1253,7 +1253,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.00 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.01 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1410,6 +1410,33 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 						pLocPak = 0;
 					}
 					CloseHandle(h);
+				}
+			}
+
+			// Load the materials file for runway surface look-up
+			char szMatsPath[MAX_PATH];
+			strcpy(szMatsPath, szCfgPath);
+			strcat(szMatsPath, "fs-base-material-lib\\MaterialLibs\\Base_MaterialLib\\Library.xml");
+			if (GetFileAttributes(szMatsPath) != INVALID_FILE_ATTRIBUTES)
+			{
+				HANDLE h = CreateFile(szMatsPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+				if (h)
+				{
+					DWORD lenHi, len = GetFileSize((HANDLE)h, &lenHi);
+					int l;
+					pMaterials = malloc(len + 1);
+					if (pMaterials)
+					{
+						ReadFile((HANDLE)h, pMaterials, len, &l, NULL);
+						pMaterials[len] = 0;
+					}
+					else
+					{
+						free(pMaterials);
+						pMaterials = 0;
+					}
+					
+					CloseHandle((HANDLE)h);
 				}
 			}
 
@@ -1963,6 +1990,7 @@ MAINLOOPS:
 	fclose(fpAFDS);
 
 	if (pLocPak) free(pLocPak);
+	if (pMaterials) free(pMaterials);
 
 	ulTotalRwys = ulTotalRwys2;
 	PostMessage(hWnd, WM_USER, 1, fOk);
@@ -1986,7 +2014,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.00");
+			SetWindowText(hDlg, "Make Runways: Version 5.01");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 

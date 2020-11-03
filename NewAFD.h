@@ -1,6 +1,7 @@
 // Thanks are due to Alessandro G. Antonini, author of BGLXML, for much of this data
 extern char *pPathName;
 extern char *pSceneryName;
+extern char* pMaterials;
 
 typedef struct _NSECTS
 {
@@ -141,6 +142,13 @@ typedef struct NRWY
 	BYTE bLights;			// 50 lights flags, see above
 	BYTE bPatternFlags;		// 51 pattern flags, see above
 } NRWY;
+
+typedef struct MSFSRUNWAY
+{
+	NRWY rx;
+	BYTE unknown[24]; // 52
+	BYTE guidSurface[16];
+} MSFSRUNWAY;
 
 typedef struct tag_offset_threshold_t
 {
