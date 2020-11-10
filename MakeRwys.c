@@ -8,6 +8,7 @@
 BOOL fMSFS = FALSE, fLocal = FALSE;
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
 int nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
+BOOL fOldComms = FALSE;
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
@@ -2155,6 +2156,13 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 		{
 			fLocal = TRUE;
 			pch += 6;
+		}
+
+		else if (_strnicmp(&pch[1], "OLDCOMMS", 5) == 0)
+
+		{
+			fOldComms = TRUE;
+			pch += 9;
 		}
 
 		else if (pch[1] == '>')

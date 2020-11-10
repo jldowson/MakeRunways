@@ -338,6 +338,7 @@ extern void MakeHelipadsFile(void);
 
 extern const char *szNRwySurf[];
 extern char* pLocPak;
+extern BOOL fOldComms;
 
 /******************************************************************************
          End of MakeRwys.h
