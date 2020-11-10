@@ -18,7 +18,7 @@ typedef struct
 
 typedef struct
 {	int nType;
-	char chFreq[6];
+	char chFreq[8];
 	char szName[256];
 } COMMSENTRY;
 
@@ -128,7 +128,7 @@ void MakeCommsFile(void)
 					errnum = 2;
 					if (fAddName)
 					{	BOOL fDoneName = FALSE;
-						char chFreqs2[14][6];
+						char chFreqs2[14][8];
 						// was static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, -1, -1, -1, 1, -1 };
 						static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, 1, 1, 1, 1, -1 };
 						memset(chFreqs2, 0, sizeof(chFreqs2));
@@ -162,17 +162,21 @@ void MakeCommsFile(void)
 						{	k = 0;
 							while (k < j)
 							{	if (c[k].nType == t)
-								{	fprintf(pf, "%.4s,%d,%.6s,\x22%s\x22\x0d\x0a", pchICAO,c[k].nType,c[k].chFreq,c[k].szName);
+								{	if (c[k].chFreq[6] == '0')
+										fprintf(pf, "%.4s,%d,%.6s,\x22%s\x22\x0d\x0a", pchICAO, c[k].nType, c[k].chFreq, c[k].szName);
+									else
+										fprintf(pf, "%.4s,%d,%.7s,\x22%s\x22\x0d\x0a", pchICAO,c[k].nType,c[k].chFreq,c[k].szName);
+
 									errnum = 6;
 									if (nEquivs[t] >= 0)
 									{	if (chFreqs2[nEquivs[t]][0] == 0)
-											memcpy(chFreqs2[nEquivs[t]], c[k].chFreq, 6);
+											memcpy(chFreqs2[nEquivs[t]], c[k].chFreq, 8);
 										if (t == 8) // Use 2nd Dep for Arr if none ...
-											memcpy(chFreqs2[11], c[k].chFreq, 6);
+											memcpy(chFreqs2[11], c[k].chFreq, 8);
 										else if (t == 9) // Use 2nd Arr for Dep if none ...
-											memcpy(chFreqs2[12], c[k].chFreq, 6);
+											memcpy(chFreqs2[12], c[k].chFreq, 8);
 										else if (t == 6) // Use 2nd Twr for Gnd if none ...
-											memcpy(chFreqs2[13], c[k].chFreq, 6);
+											memcpy(chFreqs2[13], c[k].chFreq, 8);
 										errnum = 7;
 									}
 								}
@@ -182,19 +186,24 @@ void MakeCommsFile(void)
 						errnum = 8;
 
 						// Fill in alternatives ...
-						if (chFreqs2[1][0] == 0) memcpy(chFreqs2[1], chFreqs2[8], 6);
-						// if (chFreqs2[3][0] == 0) memcpy(chFreqs2[3], chFreqs2[9], 6); // 9 unused
-						if (chFreqs2[5][0] == 0) memcpy(chFreqs2[5], chFreqs2[10], 6);
-						if (chFreqs2[7][0] == 0) memcpy(chFreqs2[7], chFreqs2[11], 6);
-						if (chFreqs2[6][0] == 0) memcpy(chFreqs2[6], chFreqs2[12], 6);
-						if (chFreqs2[2][0] == 0) memcpy(chFreqs2[2], chFreqs2[13], 6);
+						if (chFreqs2[1][0] == 0) memcpy(chFreqs2[1], chFreqs2[8], 8);
+						// if (chFreqs2[3][0] == 0) memcpy(chFreqs2[3], chFreqs2[9], 8); // 9 unused
+						if (chFreqs2[5][0] == 0) memcpy(chFreqs2[5], chFreqs2[10], 8);
+						if (chFreqs2[7][0] == 0) memcpy(chFreqs2[7], chFreqs2[11], 8);
+						if (chFreqs2[6][0] == 0) memcpy(chFreqs2[6], chFreqs2[12], 8);
+						if (chFreqs2[2][0] == 0) memcpy(chFreqs2[2], chFreqs2[13], 8);
 
 						errnum = 9;
 
 						if (!fDoneName)
 							fprintf(pf2, "%.4s,%s", pchICAO, c[0].szName);
 						for (t = 0; t < 8; t++)
-							fprintf(pf2, ",%.6s", chFreqs2[t][0] ? chFreqs2[t] : "0");
+						{	if (chFreqs2[t][6] == '0')
+								fprintf(pf2, ",%.6s", chFreqs2[t][0] ? chFreqs2[t] : "0");
+							else
+								fprintf(pf2, ",%.7s", chFreqs2[t][0] ? chFreqs2[t] : "0");
+						}
+
 						fprintf(pf2, "\x0d\x0a");
 						errnum = 10;
 					}
@@ -239,7 +248,7 @@ void MakeCommsFile(void)
 								pch = strchr(pch, '=');
 								if (!pch) break;
 								pch++;
-								memcpy(&cwk.chFreq[0], pch, 6);
+								memcpy(&cwk.chFreq[0], pch, 8);
 								errnum = 16;
 
 								while (j2 < j)
@@ -295,7 +304,7 @@ void MakeCommsFile(void)
 								pch = strchr(pch, '=');
 								if (!pch) break;
 								pch++;
-								memcpy(&c[j].chFreq[0], pch, 6);
+								memcpy(&c[j].chFreq[0], pch, 7);
 								errnum = 24;
 
 								// If already same type and freq, delete previous one
