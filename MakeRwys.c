@@ -397,7 +397,7 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 									pL->nOffThresh = runways[i].nOffThresh;
 									pL->fLat = runways[i].fLat;
 									pL->fLong = runways[i].fLong;
-									memcpy(pL->r.chILS, runways[i].chfreq, 8);
+									memcpy(pL->r.chILS, runways[i].chfreq, 6);
 									memcpy(pL->r.chILSHdg, runways[i].chILSHdg, 6);
 									
 									ProcessRunwayList(pL, TRUE, 0);
@@ -1253,7 +1253,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.01 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.02 by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -2014,7 +2014,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.01");
+			SetWindowText(hDlg, "Make Runways: Version 5.02");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 

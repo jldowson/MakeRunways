@@ -2813,9 +2813,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			if (!nCommStart) nCommStart = ftell(fpAFDS);
 
-			fprintf(fpAFDS, "          COM: Type=%d (%s), Freq=%.2f, Name=\x22%s\x22\n",
+			fprintf(fpAFDS, "          COM: Type=%d (%s), Freq=%.3f, Name=\x22%s\x22\n",
 					pc->bCommType, pszComms[(pc->bCommType > 15) ? 16 : pc->bCommType],
-					(double) ((pc->nFreq + 1000)/ 10000)/100.0,	chName);
+					(double)((pc->nFreq + 500) / 1000) / 1000.0, chName); // Allows for 8.33 spacing
+					//(double) ((pc->nFreq + 1000)/ 10000)/100.0,	chName);
 
 			nCommEnd = ftell(fpAFDS);
 

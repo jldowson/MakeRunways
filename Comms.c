@@ -18,7 +18,7 @@ typedef struct
 
 typedef struct
 {	int nType;
-	char chFreq[6];
+	char chFreq[8];
 	char szName[256];
 } COMMSENTRY;
 
@@ -52,6 +52,17 @@ void DeleteComms(char *pchICAO)
          AddComms
 ******************************************************************************/
 
+char* FindAirportName(char* pchICAO)
+{	RWYLIST* p = pR;
+	while (p)
+	{	if (strnicmp(pchICAO, p->r.chICAO, 4) == 0)
+			return p->pAirportName;
+		p = p->pTo;
+	}
+
+	return NULL;
+}
+
 void AddComms(char *pchICAO, int nCommStart, int nCommEnd, int nCommDelStart, int nCommDelEnd, char *pApName)
 {	static BOOL ftm = TRUE;
 	int i = 0, n;
@@ -64,6 +75,10 @@ void AddComms(char *pchICAO, int nCommStart, int nCommEnd, int nCommDelStart, in
 		ftm = FALSE;
 		return;
 	}
+
+	if (!pApName)
+		// Need to find name from Rwy list
+		pApName = FindAirportName(pchICAO);
 
 	while (i < nComms)
 	{	// Insert in correct oder
@@ -89,10 +104,30 @@ void AddComms(char *pchICAO, int nCommStart, int nCommEnd, int nCommDelStart, in
          MakeCommsFile
 ******************************************************************************/
 
+void ConvertCOMfreq(char* pFreq, char* pResult)
+{	static char *pchNew[12] = {
+		"05", "10", "15", "30", "35", "40", "55", "60", "65", "80", "85", "90" };
+	static char *pchOld[12] = {
+		"0", "0", "2", "2", "2", "5", "5", "5", "7", "7", "7", "0" };
+	int i;
+
+	strncpy(pResult, pFreq, 7);
+	
+	pResult[6] = 0;
+	for (i = 0; i < 12; i++)
+	{	if (strncmp(&pFreq[5], pchNew[i], 2) == 0)
+		{	strcpy(&pResult[5], pchOld[i]);
+			break;
+		}
+	}
+}
+
 #define CLIST_MAX 512
 void MakeCommsFile(void)
 {	FILE *pf = fopen("f5.csv","wb");
 	FILE *pf2 = fopen("f4.csv","wb");
+	FILE* pfx = fopen("f5x.csv", "wb");
+	FILE* pfx2 = fopen("f4x.csv", "wb");
 	FILE *pt = fopen("runways.txt","rb");
 	int i = 0, j = 0;
 	COMMSENTRY c[CLIST_MAX];
@@ -102,11 +137,12 @@ void MakeCommsFile(void)
 
 	__try{
 
-	if (nComms && pf && pf2 && pt)
+	if (nComms && pf && pf2 && pfx2 && pt)
 	{	if (pchICAO) strncpy(chPrevICAO, pchICAO, 4);
 		pchICAO = pCommsList[0].chICAO;
 		
 		fprintf(pf2, "'4004\x0d\x0a");
+		fprintf(pfx2, "'4004\x0d\x0a");
 
 		errnum = 0;
 	
@@ -128,7 +164,7 @@ void MakeCommsFile(void)
 					errnum = 2;
 					if (fAddName)
 					{	BOOL fDoneName = FALSE;
-						char chFreqs2[14][6];
+						char chFreqs2[14][8];
 						// was static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, -1, -1, -1, 1, -1 };
 						static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, 1, 1, 1, 1, -1 };
 						memset(chFreqs2, 0, sizeof(chFreqs2));
@@ -140,6 +176,7 @@ void MakeCommsFile(void)
 						{	if (c[k].nType == 0)
 							{	char chName[61], *psz;
 								fprintf(pf, "%.4s,0,0,\x22%s\x22\x0d\x0a", pchICAO,c[k].szName);
+								fprintf(pfx, "%.4s,0,0,\x22%s\x22\x0d\x0a", pchICAO, c[k].szName);
 								strncpy(chName, c[k].szName, 60);
 								chName[60] = 0;
 								psz = chName;
@@ -151,6 +188,7 @@ void MakeCommsFile(void)
 									if (psz) *psz = '-';
 								} while (psz);
 								fprintf(pf2, "%.4s,%s", pchICAO, chName);
+								fprintf(pfx2, "%.4s,%s", pchICAO, chName);
 								fDoneName = TRUE;
 								break;
 							}
@@ -161,18 +199,25 @@ void MakeCommsFile(void)
 						for (t = 1; t < 16; t++)
 						{	k = 0;
 							while (k < j)
-							{	if (c[k].nType == t)
-								{	fprintf(pf, "%.4s,%d,%.6s,\x22%s\x22\x0d\x0a", pchICAO,c[k].nType,c[k].chFreq,c[k].szName);
+							{
+								if (c[k].nType == t)
+								{
+									char chFreq[8];
+									ConvertCOMfreq(c[k].chFreq, &chFreq[0]);
+									fprintf(pf, "%.4s,%d,%.7s,\x22%s\x22\x0d\x0a", pchICAO, c[k].nType, chFreq, c[k].szName);
+									fprintf(pfx, "%.4s,%d,%.7s,\x22%s\x22\x0d\x0a", pchICAO, c[k].nType, c[k].chFreq, c[k].szName);
+
 									errnum = 6;
 									if (nEquivs[t] >= 0)
-									{	if (chFreqs2[nEquivs[t]][0] == 0)
-											memcpy(chFreqs2[nEquivs[t]], c[k].chFreq, 6);
+									{
+										if (chFreqs2[nEquivs[t]][0] == 0)
+											memcpy(chFreqs2[nEquivs[t]], c[k].chFreq, 8);
 										if (t == 8) // Use 2nd Dep for Arr if none ...
-											memcpy(chFreqs2[11], c[k].chFreq, 6);
+											memcpy(chFreqs2[11], c[k].chFreq, 8);
 										else if (t == 9) // Use 2nd Arr for Dep if none ...
-											memcpy(chFreqs2[12], c[k].chFreq, 6);
+											memcpy(chFreqs2[12], c[k].chFreq, 8);
 										else if (t == 6) // Use 2nd Twr for Gnd if none ...
-											memcpy(chFreqs2[13], c[k].chFreq, 6);
+											memcpy(chFreqs2[13], c[k].chFreq, 8);
 										errnum = 7;
 									}
 								}
@@ -182,20 +227,28 @@ void MakeCommsFile(void)
 						errnum = 8;
 
 						// Fill in alternatives ...
-						if (chFreqs2[1][0] == 0) memcpy(chFreqs2[1], chFreqs2[8], 6);
-						// if (chFreqs2[3][0] == 0) memcpy(chFreqs2[3], chFreqs2[9], 6); // 9 unused
-						if (chFreqs2[5][0] == 0) memcpy(chFreqs2[5], chFreqs2[10], 6);
-						if (chFreqs2[7][0] == 0) memcpy(chFreqs2[7], chFreqs2[11], 6);
-						if (chFreqs2[6][0] == 0) memcpy(chFreqs2[6], chFreqs2[12], 6);
-						if (chFreqs2[2][0] == 0) memcpy(chFreqs2[2], chFreqs2[13], 6);
+						if (chFreqs2[1][0] == 0) memcpy(chFreqs2[1], chFreqs2[8], 8);
+						// if (chFreqs2[3][0] == 0) memcpy(chFreqs2[3], chFreqs2[9], 8); // 9 unused
+						if (chFreqs2[5][0] == 0) memcpy(chFreqs2[5], chFreqs2[10], 8);
+						if (chFreqs2[7][0] == 0) memcpy(chFreqs2[7], chFreqs2[11], 8);
+						if (chFreqs2[6][0] == 0) memcpy(chFreqs2[6], chFreqs2[12], 8);
+						if (chFreqs2[2][0] == 0) memcpy(chFreqs2[2], chFreqs2[13], 8);
 
 						errnum = 9;
 
 						if (!fDoneName)
-							fprintf(pf2, "%.4s,%s", pchICAO, c[0].szName);
+						{	fprintf(pf2, "%.4s,%s", pchICAO, c[0].szName);
+							fprintf(pfx2, "%.4s,%s", pchICAO, c[0].szName);
+						}
 						for (t = 0; t < 8; t++)
-							fprintf(pf2, ",%.6s", chFreqs2[t][0] ? chFreqs2[t] : "0");
+						{	char chFreq[8];
+							ConvertCOMfreq(chFreqs2[t], &chFreq[0]);
+							fprintf(pf2, ",%.7s", chFreqs2[t][0] ? chFreq : "0");
+							fprintf(pfx2, ",%.7s", chFreqs2[t][0] ? chFreqs2[t] : "0");
+						}
+
 						fprintf(pf2, "\x0d\x0a");
+						fprintf(pfx2, "\x0d\x0a");
 						errnum = 10;
 					}
 	
@@ -239,7 +292,7 @@ void MakeCommsFile(void)
 								pch = strchr(pch, '=');
 								if (!pch) break;
 								pch++;
-								memcpy(&cwk.chFreq[0], pch, 6);
+								memcpy(&cwk.chFreq[0], pch, 8);
 								errnum = 16;
 
 								while (j2 < j)
@@ -295,7 +348,7 @@ void MakeCommsFile(void)
 								pch = strchr(pch, '=');
 								if (!pch) break;
 								pch++;
-								memcpy(&c[j].chFreq[0], pch, 6);
+								memcpy(&c[j].chFreq[0], pch, 7);
 								errnum = 24;
 
 								// If already same type and freq, delete previous one
@@ -345,6 +398,8 @@ void MakeCommsFile(void)
 	if (pt) fclose(pt);
 	if (pf2) fclose(pf2);
 	if (pf) fclose(pf);
+	if (pfx2) fclose(pfx2);
+	if (pfx) fclose(pfx);
 
 	// Exception Handler
 	}
