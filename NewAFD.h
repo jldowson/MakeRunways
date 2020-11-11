@@ -14,6 +14,13 @@ typedef struct _NSECTS
 
 #define NSECTS_PER_FILE 32
 
+typedef struct _NNAME
+{
+	WORD nObjType;			//  0  0x0019 
+	DWORD nLen;				//  2
+	char chName[1];			//  6
+} NNAME;
+
 typedef struct _NBGLHDR
 {
 	WORD wStamp;			//  0 0x0201
