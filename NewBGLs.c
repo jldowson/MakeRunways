@@ -6,9 +6,9 @@
 extern char chRwyT[6];
 extern char szParkNames[12][5];
 extern char szCurrentFilePath[MAX_PATH];
-int nOffsetBase = 0;
-int *pLastSetGateList = 0;
-int fDeletionsPass = 0, nMinRunwayLen = 1500;
+__int32 nOffsetBase = 0;
+__int64 *pLastSetGateList = 0;
+__int32 fDeletionsPass = 0, nMinRunwayLen = 1500;
 BOOL fIncludeWater = FALSE, fMarkJetways = FALSE, fDebugThisEntry = FALSE;;
 BOOL fNoDrawHoldConvert = TRUE; // ### 4900
 
@@ -72,7 +72,7 @@ char chOldSurf[25] = {
          Assorted conversions
 ******************************************************************************/
 
-static __int64 fslat2lat(int ndblat, float *pf, double *pd)
+static __int64 fslat2lat(__int32 ndblat, float *pf, double *pd)
 {	double f = (((double)ndblat)*180)/MAXSOUTH;
 	if (f>90.0)	f = -((f-180)+90);
 	else f = 90-f;
@@ -81,7 +81,7 @@ static __int64 fslat2lat(int ndblat, float *pf, double *pd)
 	return (__int64) ((f * 10001750.0) / 90.0);
 }
 
-static __int64 fslon2lon(int ndblon, float *pf, double *pd)
+static __int64 fslon2lon(__int32 ndblon, float *pf, double *pd)
 {	double f = (((double)ndblon)*360)/MAXEAST;
 	f -= 180;
 	if (pd) *pd = f;
@@ -130,9 +130,9 @@ static void DecodeID(DWORD number, char *p, BOOL fShift)
 ******************************************************************************/
 
 HELI helipads[10000];
-int nHelipadCtr = 0;
+__int32 nHelipadCtr = 0;
 
-int hcompare(const void *arg1, const void *arg2)
+__int32 hcompare(const void *arg1, const void *arg2)
 {	HELI *h1 = (HELI *) arg1;
 	HELI *h2 = (HELI *) arg2;
 
@@ -141,7 +141,7 @@ int hcompare(const void *arg1, const void *arg2)
 
 void MakeHelipadsFile(void)
 {	FILE *phf = fopen("helipads.csv", "wb");
-	int i = 0;
+	__int32 i = 0;
 
 	if (phf)
 	{	if (nHelipadCtr > 1)
@@ -164,7 +164,7 @@ void MakeHelipadsFile(void)
 }
 
 void DeleteHelipads(char *pchICAO)
-{	int i = 0;
+{	__int32 i = 0;
 	while (i < nHelipadCtr)
 	{	if (strncmp(helipads[i].chICAO, pchICAO, 4) == 0)
 			helipads[i].fDelete = 255;
@@ -241,7 +241,7 @@ void PrintRWSLIST(RWYLIST *pL)
 
 void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 {	BOOL fDelAll = (fAdd <= 0) && !pL->r.chRwy[0] && !pL->fAirport;
-	int nCompLen = fDelAll ? 4 : 8;
+	__int32 nCompLen = fDelAll ? 4 : 8;
 
 	// First, standardise chICAO 4 chars: ###4692
 	if (pL->r.chICAO[3] == ' ') pL->r.chICAO[3] = 0;
@@ -266,12 +266,12 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 	}
 										
 	else
-	{	int fDir = 0;
+	{	__int32 fDir = 0;
 
 		if (fAdd <= 0) pRlast = pR; // deletes need search from start
 										
 		while (pRlast) 
-		{	int comp = memcmp(&pRlast->r, &pL->r, nCompLen);
+		{	__int32 comp = memcmp(&pRlast->r, &pL->r, nCompLen);
 			if (fUserAbort) return;
 
 			if (fNewAirport && (memcmp(&pRlast->r, &pL->r, 4) == 0))
@@ -425,16 +425,16 @@ void AddRunway(RWYLIST *prwy)
          SetLocPos
 ******************************************************************************/
 
-void SetLocPos(LOCATION *pLoc, int alt, int lat, int lon, float *pflat, float *pflon, double *pdLat, double *pdLon)
+void SetLocPos(LOCATION *pLoc, __int32 alt, __int32 lat, __int32 lon, float *pflat, float *pflon, double *pdLat, double *pdLon)
 {	DWORD wk;
-	pLoc->elev = (int) ((alt * 65536.0) / 1000.0);
+	pLoc->elev = (__int32) ((alt * 65536.0) / 1000.0);
 	*((__int64 *) &pLoc->lat.f) = fslat2lat(lat, pflat, pdLat);
 	wk = (DWORD) pLoc->lat.f;
-	pLoc->lat.i = (int) pLoc->lat.f;
+	pLoc->lat.i = (__int32) pLoc->lat.f;
 	pLoc->lat.f = wk;
 	*((__int64 *) &pLoc->lon.f) = fslon2lon(lon, pflon, pdLon);
 	wk = (DWORD) pLoc->lon.f;
-	pLoc->lon.i = (int) pLoc->lon.f;
+	pLoc->lon.i = (__int32) pLoc->lon.f;
 	pLoc->lon.f = wk;
 }
 
@@ -445,7 +445,7 @@ void SetLocPos(LOCATION *pLoc, int alt, int lat, int lon, float *pflat, float *p
 void StoreName(char *psz, NNAM *pName)
 {	psz[0] = 0;
 	if (pName->nLen > 6)
-	{	int nlen = min(pName->nLen-6, 255);
+	{	__int32 nlen = min(pName->nLen-6, 255);
 		memcpy(psz, pName->chName, nlen);
 		while (nlen && !isalnum((unsigned char) psz[nlen - 1])) nlen--;
 		psz[nlen] = 0;
@@ -467,7 +467,7 @@ float HdgDiff(float f1, float f2)
 ******************************************************************************/
 
 BOOL fMatchedILS = FALSE, fFoundSome = FALSE;
-int nOffsetILS, nSizeILS;
+__int32 nOffsetILS, nSizeILS;
 char chNameILS[256];
 float fILSheading, fILSslope, fRange2;
 
@@ -475,7 +475,7 @@ float fILSheading, fILSslope, fRange2;
 //      1 = Match Name & Dir & Range
 //      -1 = List all by Range
 
-int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
+__int32 NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, __int32 nMode)
 {	char chId[16], chRwy[6], *pch;
 	NILS *pi2;
 	DWORD size2;
@@ -485,7 +485,7 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
 	chNameILS[0] = 0;
 
 	while ((size > 6) && (size >= pi->nLen))
-	{	int nThisLen = sizeof(NILS);
+	{	__int32 nThisLen = sizeof(NILS);
 
 		if (fUserAbort) return 0;
 		
@@ -497,7 +497,7 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
 			fILSslope = (pi->loc.nRec0014 == 0x0015) ? ((NILSGS *) &pi->loc.nRec0014)->fGSpitch :
 						*((WORD *) ((BYTE *) &pi->loc.fWidth + 4)) == 0x0015 ?
 							((NILSGS *) ((BYTE *) &pi->loc.fWidth + 4))->fGSpitch : 0.00F;
-			nOffsetILS = (int) &pi->wId - nOffsetBase;
+			nOffsetILS = (__int32) &pi->wId - nOffsetBase;
 			nSizeILS = pi->nLen;
 			
 			DecodeID(pi->nId, chId, 1);
@@ -591,7 +591,7 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
 		pi = (NILS *) ((BYTE *) pi + nThisLen);
 	}
 
-	if (nMode >= 0) prwy->fILSflags = 0;
+	if (prwy && (nMode >= 0)) prwy->fILSflags = 0;
 	return 0;
 }
 
@@ -599,7 +599,7 @@ int NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, int nMode)
          MatchILS
 ******************************************************************************/
 
-int MatchILS(DWORD nObjs, NSECTS *ps, BYTE *p, char *psz, RWYLIST *prwy, int nMode)
+__int32 MatchILS(DWORD nObjs, NSECTS *ps, BYTE *p, char *psz, RWYLIST *prwy, __int32 nMode)
 {	// Look for VORs (ILSs)
 	DWORD i, j;
 
@@ -612,7 +612,7 @@ int MatchILS(DWORD nObjs, NSECTS *ps, BYTE *p, char *psz, RWYLIST *prwy, int nMo
 		{	if (ps[i].nObjType == OBJTYPE_VOR)
 			{	NOBJ *po = (NOBJ *) &p[offs];
 
-				int nFreq = NewILSs((NILS *) &p[po->chunkoff], po->chunksize, psz, prwy, nMode);
+				__int32 nFreq = NewILSs((NILS *) &p[po->chunkoff], po->chunksize, psz, prwy, nMode);
 				if (nFreq)
 					return (nFreq + 5000) / 10000;
 			}
@@ -634,7 +634,7 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 	RWYLIST *pL;
 
 	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen;
+	{	__int32 nThisLen = pa->nLen;
 
 		if (fUserAbort) return 0;
 		
@@ -690,14 +690,14 @@ BOOL FindStart(RWYLIST *prwy, NAPT *pa, DWORD size, char *psz)
 // Type = 5 for primary, 6 for secondary
 void DebugRwyAdditions(NAPT * pa, DWORD size)
 {	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen, i = 0, x, j;
+	{	__int32 nThisLen = pa->nLen, i = 0, x, j;
 		char wk[256];
 		BYTE* pb = (BYTE *) pa;
 
 		if (fUserAbort) return;
 		
 		fprintf(fpAFDS, "### AFTER RWY: at OFFSET %08X ID=%04X LEN=%d\n",
-			(int) ((BYTE *) &pa->wId - nOffsetBase), pa->wId, nThisLen);
+			(__int32) ((BYTE *) &pa->wId - nOffsetBase), pa->wId, nThisLen);
 		j = nThisLen;
 		while (j--)
 		{	if ((i & 15) == 0)
@@ -723,7 +723,7 @@ void DebugRwyAdditions(NAPT * pa, DWORD size)
 BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, short int nType)
 {
 	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen;
+	{	__int32 nThisLen = pa->nLen;
 
 		if (fUserAbort) return 0;
 
@@ -734,7 +734,7 @@ BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, short int nType)
 			NOFFTHR *ps = (NOFFTHR *) ((BYTE *) pa + ((nType < 0) ? 16 : 0));
 
 			nThisLen = pa->nLen;
-			prwy->nOffThresh = (unsigned int) ((ps->fLength * 3.28084F) + .5F);
+			prwy->nOffThresh = (unsigned __int32) ((ps->fLength * 3.28084F) + .5F);
 
 			fprintf(fpAFDS, "              Offset Threshold %s: %d feet\n",
 				(abs(nType) == 5) ? "primary" : "secondary", prwy->nOffThresh); 
@@ -756,7 +756,7 @@ BOOL FindOffThresh(RWYLIST* prwy, NAPT* pa, DWORD size, short int nType)
 // Type = 11 for primary left, 12 for primary right, 13 sec left, 14 sec right
 BOOL FindVASI(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 {	while (pa->nLen && (size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen;
+	{	__int32 nThisLen = pa->nLen;
 
 		if (fUserAbort) return 0;
 
@@ -798,7 +798,7 @@ BOOL FindVASI(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 // Type = 15 primary, 16 secondary, or 0xDF, 0xE0 for MSFS
 BOOL FindAppLights(RWYLIST *prwy, NAPT *pa, DWORD size, WORD nType)
 {	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen;
+	{	__int32 nThisLen = pa->nLen;
 
 		if (fUserAbort) return 0;
 
@@ -844,8 +844,8 @@ void WriteFSM(RWYLIST *pAp)
 
 TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
-	int wp1, wp2;
-	int nAllocSize = (40*wP) + (32*wT*wP);
+	__int32 wp1, wp2;
+	__int32 nAllocSize = (40*wP) + (32*wT*wP);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -930,7 +930,7 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 				
 				if (!f1seen || !f2seen)
 				{	if (f1seen)
-					{	int wrk = wp1;
+					{	__int32 wrk = wp1;
 						wp1 = wp2;
 						wp2 = wrk;
 					}
@@ -959,7 +959,7 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 			}
 
 			else
-			{	int wp1x = (-wp1) - 1;
+			{	__int32 wp1x = (-wp1) - 1;
 				SetLocPos(&locg, 0, 
 					ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
 					ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
@@ -993,7 +993,7 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 				}
 
 				else
-				{	int wp2x = (-wp2)-1;
+				{	__int32 wp2x = (-wp2)-1;
 					SetLocPos(&locg, 0,
 						ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
 						ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
@@ -1065,13 +1065,13 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 	twh->wPoints = 0; // terminator
 
 	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(int) &twh[1] - (int) twh0, nAllocSize);
+	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
 
-	if (nAllocSize > ((int) &twh[1] - (int) twh0))
+	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (int) &twh[1] - (int) twh0);
+		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (int) &twh[1] - (int) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
 			free(twh0);
 			twh0 = twh1;
 		}
@@ -1091,8 +1091,8 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 
 TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
-	int wp1, wp2;
-	int nAllocSize = (40*wP) + (32*wT*wP);
+	__int32 wp1, wp2;
+	__int32 nAllocSize = (40*wP) + (32*wT*wP);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -1175,7 +1175,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 				
 				if (!f1seen || !f2seen)
 				{	if (f1seen)
-					{	int wrk = wp1;
+					{	__int32 wrk = wp1;
 						wp1 = wp2;
 						wp2 = wrk;
 					}
@@ -1204,7 +1204,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 			}
 
 			else
-			{	int wp1x = (-wp1) - 1;
+			{	__int32 wp1x = (-wp1) - 1;
 				SetLocPos(&locg, 0, 
 					ppg3 ? (*(ppg3[wp1x])).nLat : (*(ppg[wp1x])).nLat,
 					ppg3 ? (*(ppg3[wp1x])).nLon : (*(ppg[wp1x])).nLon,
@@ -1238,7 +1238,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 				}
 
 				else
-				{	int wp2x = (-wp2)-1;
+				{	__int32 wp2x = (-wp2)-1;
 					SetLocPos(&locg, 0,
 						ppg3 ? (*(ppg3[wp2x])).nLat : (*(ppg[wp2x])).nLat,
 						ppg3 ? (*(ppg3[wp2x])).nLon : (*(ppg[wp2x])).nLon,
@@ -1310,13 +1310,13 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	twh->wPoints = 0; // terminator
 
 	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(int) &twh[1] - (int) twh0, nAllocSize);
+	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
 
-	if (nAllocSize > ((int) &twh[1] - (int) twh0))
+	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (int) &twh[1] - (int) twh0);
+		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (int) &twh[1] - (int) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
 			free(twh0);
 			twh0 = twh1;
 		}
@@ -1336,8 +1336,8 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 
 TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
-	int wp1, wp2;
-	int nAllocSize = (40*wP) + (32*wT*wP);
+	__int32 wp1, wp2;
+	__int32 nAllocSize = (40*wP) + (32*wT*wP);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -1421,7 +1421,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 				
 				if (!f1seen || !f2seen)
 				{	if (f1seen)
-					{	int wrk = wp1;
+					{	__int32 wrk = wp1;
 						wp1 = wp2;
 						wp2 = wrk;
 					}
@@ -1450,7 +1450,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 			}
 
 			else
-			{	int wp1x = (-wp1) - 1;
+			{	__int32 wp1x = (-wp1) - 1;
 				SetLocPos(&locg, 0, 
 					ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
 					ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
@@ -1484,7 +1484,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 				}
 
 				else
-				{	int wp2x = (-wp2)-1;
+				{	__int32 wp2x = (-wp2)-1;
 					SetLocPos(&locg, 0,
 						ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
 						ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
@@ -1556,13 +1556,13 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 	twh->wPoints = 0; // terminator
 
 	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(int) &twh[1] - (int) twh0, nAllocSize);
+	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
 
-	if (nAllocSize > ((int) &twh[1] - (int) twh0))
+	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (int) &twh[1] - (int) twh0);
+		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (int) &twh[1] - (int) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
 			free(twh0);
 			twh0 = twh1;
 		}
@@ -1582,8 +1582,8 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 
 TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
-	int wp1, wp2;
-	int nAllocSize = (40*wP) + (32*wT*wP);
+	__int32 wp1, wp2;
+	__int32 nAllocSize = (40*wP) + (32*wT*wP);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -1669,7 +1669,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 				
 				if (!f1seen || !f2seen)
 				{	if (f1seen)
-					{	int wrk = wp1;
+					{	__int32 wrk = wp1;
 						wp1 = wp2;
 						wp2 = wrk;
 					}
@@ -1698,7 +1698,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 			}
 
 			else
-			{	int wp1x = (-wp1) - 1;
+			{	__int32 wp1x = (-wp1) - 1;
 				SetLocPos(&locg, 0, 
 					ppg3 ? (*(ppg3[wp1x])).nLat : ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
 					ppg3 ? (*(ppg3[wp1x])).nLon : ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
@@ -1732,7 +1732,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 				}
 
 				else
-				{	int wp2x = (-wp2)-1;
+				{	__int32 wp2x = (-wp2)-1;
 					SetLocPos(&locg, 0,
 						ppg3 ? (*(ppg3[wp2x])).nLat : ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
 						ppg3 ? (*(ppg3[wp2x])).nLon : ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
@@ -1804,13 +1804,13 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 	twh->wPoints = 0; // terminator
 
 	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(int) &twh[1] - (int) twh0, nAllocSize);
+	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
 
-	if (nAllocSize > ((int) &twh[1] - (int) twh0))
+	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (int) &twh[1] - (int) twh0);
+		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (int) &twh[1] - (int) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
 			free(twh0);
 			twh0 = twh1;
 		}
@@ -1831,8 +1831,8 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WORD wN, WORD wP)
 {
 	WORD wo = wN, w2;
-	int wp1, wp2;
-	int nAllocSize = (40 * wP) + (32 * wT * wP);
+	__int32 wp1, wp2;
+	__int32 nAllocSize = (40 * wP) + (32 * wT * wP);
 	TWHDR* twh = (TWHDR*)malloc(nAllocSize);
 	TWHDR* twh0 = twh;
 
@@ -1922,7 +1922,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 				{
 					if (f1seen)
 					{
-						int wrk = wp1;
+						__int32 wrk = wp1;
 						wp1 = wp2;
 						wp2 = wrk;
 					}
@@ -1953,7 +1953,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 
 			else
 			{
-				int wp1x = (-wp1) - 1;
+				__int32 wp1x = (-wp1) - 1;
 				SetLocPos(&locg, 0,
 					(*(ppg4[wp1x])).nLat, (*(ppg4[wp1x])).nLon,
 					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
@@ -1989,7 +1989,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 
 				else
 				{
-					int wp2x = (-wp2) - 1;
+					__int32 wp2x = (-wp2) - 1;
 					SetLocPos(&locg, 0,
 						(*(ppg4[wp2x])).nLat, (*(ppg4[wp2x])).nLon,
 						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
@@ -2062,14 +2062,14 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 	twh->wPoints = 0; // terminator
 
 	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(int) &twh[1] - (int) twh0, nAllocSize);
+	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
 
-	if (nAllocSize > ((int)&twh[1] - (int)twh0))
+	if (nAllocSize > ((__int32)&twh[1] - (__int32)twh0))
 	{	// Revise allocation to suit needs
-		TWHDR* twh1 = malloc(32 + (int)&twh[1] - (int)twh0);
+		TWHDR* twh1 = malloc(32 + (__int32)&twh[1] - (__int32)twh0);
 		if (twh1)
 		{
-			memcpy((BYTE*)twh1, (BYTE*)twh0, (int)&twh[1] - (int)twh0);
+			memcpy((BYTE*)twh1, (BYTE*)twh0, (__int32)&twh[1] - (__int32)twh0);
 			free(twh0);
 			twh0 = twh1;
 		}
@@ -2139,10 +2139,10 @@ void CorrectRunwayMagvar(char *pchICAO, float fNewMagvar)
 		 FindILSdetails
 ******************************************************************************/
 
-void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, int nMode)
+void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, __int32 nMode)
 {
 	float fILSHdgMag;
-	int nFreq = MatchILS(nObjs, ps, p, psz, prwy, nMode);
+	__int32 nFreq = MatchILS(nObjs, ps, p, psz, prwy, nMode);
 
 	if (!nFreq)
 		return;
@@ -2156,7 +2156,7 @@ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, 
 	else if (fILSHdgMag > 360.0F) fILSHdgMag -= 360.0F;
 
 	char wk[8];
-	int l = l = sprintf(wk, "%.3f", (double)fILSHdgMag);
+	__int32 l = l = sprintf(wk, "%.3f", (double)fILSHdgMag);
 	if (l > 5) wk[5] = 0;
 	else if (wk[l - 1] == '0') wk[l - 1] = 0;
 	memcpy(prwy->r.chILSHdg, wk, 6);
@@ -2191,7 +2191,7 @@ void GetNameString(char* p)
 		if (psz)
 		{	psz += 3;
 			psz2 = strchr(psz, '\x22');
-			strncpy(p, psz, (int)(psz2 - psz));
+			strncpy(p, psz, (__int32)(psz2 - psz));
 			p[psz2 - psz] = 0;
 
 			// Remove all \ characters:
@@ -2224,8 +2224,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 	NTAXIPT *pTpnt = 0;
 	NEWTAXIPT *pNTpnt = 0;
 	NTAXINM *pTname = 0;
-	int nCommStart = 0, nCommEnd = 0;
-	int nCommDelStart = 0, nCommDelEnd = 0;
+	__int32 nCommStart = 0, nCommEnd = 0;
+	__int32 nCommDelStart = 0, nCommDelEnd = 0;
 	char *pApName = 0;
 	char *pCitName = 0, *pStaName = 0, *pCtyName = 0;
 	BOOL fDelTitleDone = FALSE;
@@ -2240,7 +2240,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 	chICAO[0] = 0;
 			
 	while ((size > 6) && (size >= pa->nLen))
-	{	int nThisLen = pa->nLen;
+	{	__int32 nThisLen = pa->nLen;
 		if (fUserAbort) return;
 
 		if ((pa->wId == OBJTYPE_AIRPORT) || (pa->wId == OBJTYPE_NEWAIRPORT) ||
@@ -2266,7 +2266,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			else if (pa->wId == OBJTYPE_AIRPORT_MSFS) nThisLen += 12;
 
 			if (!fDeletionsPass)
-			{	if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (int) &pa->wId - nOffsetBase, (int) &pa->wId - nOffsetBase + nThisLen);
+			{	if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (__int32) &pa->wId - nOffsetBase, (__int32) &pa->wId - nOffsetBase + nThisLen);
 				
 				fprintf(fpAFDS, "\nAirport %s :", chICAO);
 				
@@ -2297,20 +2297,20 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			
 				// Find City and Airport Names
 				if (pRegion)
-				{	int nICAOs = pRegion->wIcaoCount;
+				{	__int32 nICAOs = pRegion->wIcaoCount;
 					NICAO *pICAOs = (NICAO *) ((BYTE *) pRegion + pRegion->nIcaoPtr);
 
 					while (nICAOs--)
 					{	if (pICAOs->nId == id)
 						{	// Found this ICAO id
 							DWORD *ppCountries = (DWORD *) ((BYTE *) pRegion + pRegion->nCountryPtr);
-							int nCountries = pRegion->wCountryCount, nCountryNum = pICAOs->bCountryIndex;
+							__int32 nCountries = pRegion->wCountryCount, nCountryNum = pICAOs->bCountryIndex;
 							DWORD *ppStates = (DWORD *) ((BYTE *) pRegion + pRegion->nStatePtr);
-							int nStates = pRegion->wStateCount, nStateNum = pICAOs->wStateIndex / 16;
+							__int32 nStates = pRegion->wStateCount, nStateNum = pICAOs->wStateIndex / 16;
 							DWORD *ppCities = (DWORD *) ((BYTE *) pRegion + pRegion->nCityPtr);
-							int nCities = pRegion->wCityCount, nCityNum = pICAOs->wCitiesIndex;
+							__int32 nCities = pRegion->wCityCount, nCityNum = pICAOs->wCitiesIndex;
 							DWORD *ppAirports = (DWORD *) ((BYTE *) pRegion + pRegion->nAirportPtr);
-							int nAirports = pRegion->wAirportCount, nAirportNum = pICAOs->wAirportIndex;
+							__int32 nAirports = pRegion->wAirportCount, nAirportNum = pICAOs->wAirportIndex;
 
 							if (nCountries > nCountryNum)
 							{	copyxmlstring(pNextCountryName, (char *) ppCountries + ppCountries[nCountryNum] + (nCountries * 4));
@@ -2401,7 +2401,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			
 			if (pd[6] & (BIT_DELETE_ALL_RUNWAYS | BIT_DELETE_ALL_STARTS))
 			{	// delete all runways!
-				int fDelMode =
+				__int32 fDelMode =
 					((pd[6] & (BIT_DELETE_ALL_RUNWAYS | BIT_DELETE_ALL_STARTS)) == (BIT_DELETE_ALL_RUNWAYS | BIT_DELETE_ALL_STARTS)) ? 3 :
 					(pd[6] & BIT_DELETE_ALL_RUNWAYS) ? 1 : 2;
 				rwy1.r.chRwy[0] = 0;
@@ -2418,7 +2418,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			}
 
 			else // Need to check details
-			{	int i, j = 13;
+			{	__int32 i, j = 13;
 				
 				// pd[8]= Number of runways to delete
 				for (i = 0; i < pd[8]; i++)
@@ -2475,13 +2475,13 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			else if (pd[10]) // Need to check details
 			{	// pd[10]= Number of starts to delete
-				int i, j = 12 + (pd[8] * 4) + (pd[9] * 4);
+				__int32 i, j = 12 + (pd[8] * 4) + (pd[9] * 4);
 				if (!nCommDelStart) nCommDelStart = ftell(fpAFDS);
 				for (i = 0; i < pd[10]; i++) if (pd[j+3] & 0xf0)
-				{	int type = (pd[j+3] >> 28) & 0xff;		//  ########################### ?????????? >>28 on a Byte?
+				{	__int32 type = (pd[j+3] >> 28) & 0xff;		//  ########################### ?????????? >>28 on a Byte?
 					fprintf(fpAFDS, "          COM: Delete, Type=%d (%s), Freq=%.2f\n",
 						type, pszComms[(type > 15) ? 16 : type],
-						(double) ((*((int *) &pd[j]) & 0x0fffffff) / 10000) / 100.0);
+						(double) ((*((__int32 *) &pd[j]) & 0x0fffffff) / 10000) / 100.0);
 					// Specific frequency deletion to follow ###################################
 					j += 4;
 				}
@@ -2494,7 +2494,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					|| (pa->wId == OBJTYPE_MSFSRUNWAY)))
 		{	// Runway record found
 			NRWY *pr = (NRWY *) pa;
-			int nFreq = 0, fOk = 0, fList = 0;
+			__int32 nFreq = 0, fOk = 0, fList = 0;
 			ANGLE Rlat, Rlong;
 			WORD wSurf = 0;
 
@@ -2572,7 +2572,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 						if (psz)
 						{
 							*psz = 0;
-							for (int x = 0; x < 25; x++)
+							for (__int32 x = 0; x < 25; x++)
 							{
 								if (_stricmp(szNRwySurf[x], szName) == 0)
 								{
@@ -2725,8 +2725,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				(double) fHeading, (double) fMagvar,
 				wSurf > 23 ? chWork : szNRwySurf[wSurf],
 				(pr->wSurface & 128) ? " (Transparent)" : "",
-				(int) ((pr->fLength * 3.28084) + 0.5),
-				(int) ((pr->fWidth * 3.28084) + 0.5));					
+				(__int32) ((pr->fLength * 3.28084) + 0.5),
+				(__int32) ((pr->fWidth * 3.28084) + 0.5));					
 
 			fFoundSome = FALSE; // ILS search flag
 
@@ -2768,14 +2768,14 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			// Find City Name first
 			if (pRegion)
-			{	int nICAOs = pRegion->wIcaoCount;
+			{	__int32 nICAOs = pRegion->wIcaoCount;
 				NICAO *pICAOs = (NICAO *) ((BYTE *) pRegion + pRegion->nIcaoPtr);
 
 				while (nICAOs--)
 				{	if (pICAOs->nId == id)
 					{	// Found this ICAO id
 						DWORD *ppCities = (DWORD *) ((BYTE *) pRegion + pRegion->nCityPtr);
-						int nCities = pRegion->wCityCount, nCityNum = pICAOs->wCitiesIndex;
+						__int32 nCities = pRegion->wCityCount, nCityNum = pICAOs->wCitiesIndex;
 
 						if (nCities > nCityNum)
 						{	strcpy(pNextCityName, (char *) ppCities + ppCities[nCityNum] + (nCities * 4));
@@ -2805,7 +2805,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			chName[0] = 0;
 
 			if (pc->nLen > sizeof(NCOMM))
-			{	int nlen = min(pc->nLen - sizeof(NCOMM), 255);
+			{	__int32 nlen = min(pc->nLen - sizeof(NCOMM), 255);
 				memcpy(chName, (char *) pc + sizeof(NCOMM), nlen);
 				while (nlen && !isalnum((unsigned char) chName[nlen - 1])) nlen--;
 				chName[nlen] = 0; // Get rid of bad terminations
@@ -2822,7 +2822,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			if (ap.fAirport && ((pc->bCommType == 1) || (((pc->bCommType == 12) || (pc->bCommType == 13)) && (ap.Atis < 0x1800))))
 			{	// ATIS / AWOS / ASOS
-				int nAtis =((pc->nFreq + 5000) / 10000) % 10000;
+				__int32 nAtis =((pc->nFreq + 5000) / 10000) % 10000;
 
 				// convert to BCD
 				ap.Atis = (nAtis/1000) << 12;
@@ -2845,7 +2845,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				fMarkJetways &&	pLastSetGateList && prwyPrevious)
 		{	// Jetway record found
 			NJETWAY *pjw = (NJETWAY *) pa;
-			int nGateNum = pjw->wParkingNumber;
+			__int32 nGateNum = pjw->wParkingNumber;
 			BOOL fJetwayOk = FALSE;
 
 			NGATEHDR *pgh= prwyPrevious->pGateList;
@@ -2897,9 +2897,9 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			memcpy(rwy1.r.chICAO, chICAO, 4);
 			rwy1.pGateList = (NGATEHDR *) malloc(nThisLen);
 			
-			pLastSetGateList = (int *) malloc(4 * (wCtr+1));
+			pLastSetGateList = (int *) malloc(sizeof(__int64) * (wCtr+1));
 			if (pLastSetGateList)
-				pLastSetGateList[0] = (int) wCtr | (pa->wId << 16);
+				pLastSetGateList[0] = (__int32) wCtr | (pa->wId << 16);
 			
 			strcpy(rwy1.r.chRwy, "999");
 			memcpy(rwy1.pGateList, pa, nThisLen);
@@ -2951,7 +2951,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				}
 				
 				w++;
-				pLastSetGateList[w] = (int) pg; // Index for use in Taxipath decode
+				pLastSetGateList[w] = (__int64) pg; // Index for use in Taxipath decode
 				pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) + 
 					(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
 				if (pa->wId == OBJTYPE_MSFSTAXIPARK)
@@ -2980,8 +2980,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char *pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					pTpath[w].wEnd &= 0x0fff;
-					pTpath[w].wStart &= 0x0fff;
+					//pTpath[w].wEnd &= 0x0fff;
+					//pTpath[w].wStart &= 0x0fff;
 					pTpath[w].bDrawFlags &= 0x0f;
 
 					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n", 
@@ -3005,8 +3005,9 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char *pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					pNTpath[w].wEnd &= 0x0fff;
-					pNTpath[w].wStart &= 0x0fff;
+					// Removed these for MSFS
+					//pNTpath[w].wEnd &= 0x0fff;
+					//pNTpath[w].wStart &= 0x0fff;
 					pNTpath[w].bDrawFlags &= 0x0f;
 
 					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n", 
@@ -3055,8 +3056,9 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char *pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					pNTpath2[w].wEnd &= 0x0fff;
-					pNTpath2[w].wStart &= 0x0fff;
+					// Why are these here?
+					//pNTpath2[w].wEnd &= 0x0fff;
+					//pNTpath2[w].wStart &= 0x0fff;
 					pNTpath2[w].bDrawFlags &= 0x0f;
 
 					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n", 
@@ -3092,7 +3094,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			WORD w = 0;
 			pTpnt = (NTAXIPT *) ((char *) pa + sizeof(NTAXIHDR));
 			wTpnt = pth->wCount;
-			
+
 			nThisLen = pth->nLen;
 			
 			while (w < wTpnt)
@@ -3110,7 +3112,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				fprintf(fpAFDS, "          Taxipoint #%d, type %d (%s):  ",
 					w, bType, bType < 8 ? pszTaxiPtTypes[bType] : "?");
 				SetLocPos(&loct, 0, pTpnt[w].nLat, pTpnt[w].nLon, &fLat, &fLon, 0, 0);
-				WritePosition(&loct, 0);
+				if (fDecCoords)
+					fprintf(fpAFDS, "%.9f  %.9f", fLat, fLon);
+				else
+					WritePosition(&loct, 0);
 				fprintf(fpAFDS, "  -- %s\n", pTpnt[w].bOrientation == 1 ? "Reverse" : "Forward");
 				pTpnt[w].fLat = fLat; // For later ...
 				pTpnt[w].fLon = fLon;
@@ -3142,7 +3147,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				fprintf(fpAFDS, "          Taxipoint #%d, type %d (%s):  ",
 					w, bType, bType < 8 ? pszTaxiPtTypes[bType] : "?");
 				SetLocPos(&loct, 0, pNTpnt[w].nLat, pNTpnt[w].nLon, &fLat, &fLon, 0, 0);
-				WritePosition(&loct, 0);
+				if (fDecCoords)
+					fprintf(fpAFDS, "%.9f  %.9f", fLat, fLon);
+				else
+					WritePosition(&loct, 0);
 				fprintf(fpAFDS, "  -- %s\n", pNTpnt[w].bOrientation == 1 ? "Reverse" : "Forward");
 				pNTpnt[w].fLat = fLat; // For later ...
 				pNTpnt[w].fLon = fLon;
@@ -3152,7 +3160,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 		else if (!fDeletionsPass && id && (pa->wId == OBJTYPE_HELIPAD))
 			DoHelipadOnly((helipad_t*) pa, &chICAO[0]);
-		
+	
 		if (wTpnt && wTname && wTpath)
 		{	// Generate taxiway table for this airport's t5.csv file.
 			memset(&rwy1, 0, sizeof(RWYLIST));
@@ -3228,7 +3236,7 @@ void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 			{	// Read complete file
 				p = (BYTE *) malloc(fsize);
 				ulTotalBytes += fsize - sizeof(NBGLHDR);
-				nOffsetBase = (int) p;
+				nOffsetBase = (__int32) p;
 
 				fseek(fpIn, 0, SEEK_SET);
 				if (!p || (fread(p, 1, fsize, fpIn) != fsize))

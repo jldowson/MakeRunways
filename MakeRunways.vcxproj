@@ -104,6 +104,36 @@
       <OutputFile>$(OutDir)MakeRwys.exe</OutputFile>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Link>
+      <StackReserveSize>24000</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Link>
+      <StackCommitSize>24000</StackCommitSize>
+      <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)MakeRunways.exe</OutputFile>
+    </Link>
+    <ClCompile>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Link>
+      <StackReserveSize>24000</StackReserveSize>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Link>
+      <StackCommitSize>24000</StackCommitSize>
+      <AdditionalDependencies>version.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <OutputFile>$(OutDir)MakeRwys.exe</OutputFile>
+    </Link>
+    <ClCompile>
+      <StructMemberAlignment>Default</StructMemberAlignment>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="afxres.h" />
     <ClInclude Include="Full New AFD.h" />

@@ -5,9 +5,9 @@
 #include "shfolder.h"
 #include <winver.h>
 
-BOOL fMSFS = FALSE, fLocal = FALSE;
+BOOL fMSFS = FALSE, fLocal = FALSE, fDecCoords = FALSE;
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
-int nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
+__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
@@ -15,14 +15,14 @@ int nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepa
 	BOOL fDoMSFS = TRUE;
 #endif
 
-int errnum = 0;
-int nMatchMyAirline = 0;
+__int32 errnum = 0;
+__int32 nMatchMyAirline = 0;
 char chMyAirLine[5];
 char chMyGates[32];
 BOOL fProcessTA = FALSE;
 extern char *pszParkType[];
 extern char *pszGateType[];
-extern int fDeletionsPass, nMinRunwayLen;
+extern __int32 fDeletionsPass, nMinRunwayLen;
 extern BOOL fIncludeWater, fMarkJetways;
 void UpdateTransitionAlts(void);
 char *pszSimName[9] = {
@@ -92,7 +92,7 @@ ANGLE lat, lon;
 HWND hWnd;
 BOOL fUserAbort = 0, fWritingFiles = FALSE, fNewAirport = FALSE, fQuiet = FALSE;
 BOOL fNoLoadLorby = FALSE;
-int fFS9 = 0;
+__int32 fFS9 = 0;
 DWORD ulTotalAPs = 0, ulTotalRwys = 0, ulTotalRwys2 = 0;
 DWORD ulTotalBGLs = 0, ulTotalBytes = 0;
 
@@ -120,8 +120,8 @@ char *str2ascii(char *psz)
 	return psz;
 }
 
-void DecodeRwy(unsigned long n, unsigned long c, char *pch, int offs, int size)
-{	int i;
+void DecodeRwy(unsigned long n, unsigned long c, char *pch, __int32 offs, __int32 size)
+{	__int32 i;
 	if ((n > 36) && (n < 45))
 		i = sprintf(pch, "%s", chOddRwys[n-37+offs]);
 	else i = sprintf(pch, "%d", n);
@@ -129,7 +129,7 @@ void DecodeRwy(unsigned long n, unsigned long c, char *pch, int offs, int size)
 	sprintf(&pch[i], "%c", c > 4 ? '?' : chRwyT[c]);
 }
 
-unsigned long lmultdiv(unsigned long m1, unsigned long m2, unsigned long d, int fRound)
+unsigned long lmultdiv(unsigned long m1, unsigned long m2, unsigned long d, __int32 fRound)
 {	double m1d = m1;
 	double m2d = m2;
 	double dd = d;
@@ -172,7 +172,7 @@ float ToFeet(long alt)
 	return alt < 0 ? -res : res;
 }
 
-double Heading(unsigned long i, unsigned short f, int fZeroOk)
+double Heading(unsigned long i, unsigned short f, __int32 fZeroOk)
 {	double ri, r = (360.0 * i) / (65536.0 * 65536.0);
 	if (f) r += (360.0 * f) / (65536.0 * 65536.0 * 65536.0);
 
@@ -212,16 +212,16 @@ void WritePosition(LOCATION *ploc, BOOL fWithAlt)
          FacilityDetails
 ******************************************************************************/
 
-void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
+void FacilityDetails(__int32 type, unsigned long offs, FILE *fpIn)
 {	OBJECT o;
-	int fRunwaySeen = 0;
+	__int32 fRunwaySeen = 0;
 	double fHeading, fMagvar;
-	static int numrwys = 0;
+	static __int32 numrwys = 0;
 	static unsigned char icao[8];
-	static RWY runways[32];
+	static RWY runways[64];
 	static RWYLIST ap;
-	static int fdoingrwy = 0;
-	unsigned int ulSeekLocSet = 0;
+	static __int32 fdoingrwy = 0;
+	unsigned __int32 ulSeekLocSet = 0;
 
 	ap.fAirport = 0; // No airport yet
 
@@ -233,9 +233,9 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 	{	while (1)
 		{	// Read stuff in OBJECT_CONTAINERs
 			unsigned long hdr[2];
-			unsigned int offsthen = ftell(fpIn);
+			unsigned __int32 offsthen = ftell(fpIn);
 				
-			int fOk = 0;
+			__int32 fOk = 0;
 			
 			#ifdef HEX
 				unsigned char ch[16];
@@ -254,8 +254,8 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 			if (hdr[1] <= sizeof(LOCATION))
 			{	LOCATION loc;
 				char chWork[48], chWork2[48];
-				int i, k = 0;
-				unsigned int offsnow = ftell(fpIn);
+				__int32 i, k = 0;
+				unsigned __int32 offsnow = ftell(fpIn);
 				ANGLE Rlat, Rlong;
 				
 				if (fread(&loc, 1, hdr[1], fpIn) != hdr[1]) break;
@@ -266,7 +266,7 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 							hdr[0], hdr[1]);
 
 					while ((unsigned int) k < hdr[1])
-					{	int j;
+					{	__int32 j;
 					
 						i = hdr[1] > 16 ? 16 : hdr[1];
 						fprintf(fpAFDS, "               : ");
@@ -457,9 +457,9 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 							}
 
 							if (fdoingrwy && numrwys && (loc.ntype == 4))
-							{	int hdg = (int) ((Heading(loc.hdg.i, loc.hdg.f, 0) + 5.0) / 10.0);
-								int diff1 = labs(runways[numrwys-1].rwyn - hdg);
-								int diff2 = labs(runways[numrwys-2].rwyn - hdg);
+							{	__int32 hdg = (int) ((Heading(loc.hdg.i, loc.hdg.f, 0) + 5.0) / 10.0);
+								__int32 diff1 = labs(runways[numrwys-1].rwyn - hdg);
+								__int32 diff2 = labs(runways[numrwys-2].rwyn - hdg);
 								if (diff1 > 18) diff1 = 36-18;
 								if (diff2 > 18) diff2 = 36-18;
 								memcpy(runways[numrwys-1-(diff1>diff2)].chfreq, chWork, 6);
@@ -507,7 +507,7 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 			if (fOk > 0) fprintf(fpAFDS,"\n");
 
 			else if (fOk == 0)
-			{	unsigned int uL = hdr[1];
+			{	unsigned __int32 uL = hdr[1];
 
 				#ifdef HEX
 					fprintf(fpAFDS,"-- :type %X, length %d\n",
@@ -518,7 +518,7 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 					}
 					
 					while (hdr[1])
-					{	int j, i = hdr[1] > 16 ? 16 : hdr[1];
+					{	__int32 j, i = hdr[1] > 16 ? 16 : hdr[1];
 						hdr[1] -= i;
 						uL -= i;
 						if (fread(ch, 1, i, fpIn) != (unsigned int) i) break;
@@ -564,7 +564,7 @@ void FacilityDetails(int type, unsigned long offs, FILE *fpIn)
 void CheckBGL(FILE *fpIn)
 {	// Analyse NAME_LIST
 	NAMELIST nl;
-	int ftm = 1, i, j = 0;
+	__int32 ftm = 1, i, j = 0;
 	unsigned long offs = ftell(fpIn);
 	char chwork[64];
 		
@@ -581,7 +581,7 @@ void CheckBGL(FILE *fpIn)
 		}
 		else
 		{	// Read whole name list and process in memory:
-			int len = nl.len - sizeof(NAMELIST) + 8;
+			__int32 len = nl.len - sizeof(NAMELIST) + 8;
 			NAMEENTRY *pnlist = (NAMEENTRY *) malloc(len);
 			NAMEENTRY *pn = pnlist;
 			if (!pnlist) break;
@@ -597,8 +597,8 @@ void CheckBGL(FILE *fpIn)
 		
 				if (pn->type == NAME_ENTRY)
 				{	char *pFac = NULL;
-					int fOk = 1;
-					unsigned int type = pn->t;
+					__int32 fOk = 1;
+					unsigned __int32 type = pn->t;
 
 					if ((type >= FACILITY_REGION) && (type < FACILITY_AIRPORT))
 						pFac = szFacilities[type - FACILITY_REGION];
@@ -637,7 +637,7 @@ void CheckBGL(FILE *fpIn)
 ******************************************************************************/
 
 // nVers = 0 FSX, 1 ESP, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5
-int SetSceneryCfgPath(char *psz, int nVers)
+__int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 {	static char *pszCfgPaths[7] = {
 			"\\Microsoft\\FSX\\SCENERY.CFG",
 			"\\Microsoft\\FSX-SE\\SCENERY.CFG",
@@ -655,14 +655,14 @@ int SetSceneryCfgPath(char *psz, int nVers)
 
 	WIN32_FIND_DATA fd;
 	BOOL fSearching = FALSE, ftm = TRUE, fOkay = FALSE;
-	int len2;
+	__int32 len2;
 
 	nVersion = nVers;
 	
 	if (nVers >= 4)
 	{	// For Prepar3D v3 - v5, see if AddonOrganizer is available
 		char szAddonsPath[(MAX_PATH * 2) + 16], szMyPath2[MAX_PATH], *pch;
-		int len, len2 = MAX_PATH + 64;
+		__int32 len, len2 = MAX_PATH + 64;
 
 		szAddonsPath[0] = 0;
 		GetModuleFileName(hInstance, szMyPath2, MAX_PATH);
@@ -775,7 +775,7 @@ int SetSceneryCfgPath(char *psz, int nVers)
 		}
 
 		if (!fSkip)
-		{	int len = strlen(szPathName);
+		{	__int32 len = strlen(szPathName);
 			DWORD lenh = 0;
 		
 			if (fSearching)
@@ -914,7 +914,7 @@ void ScanSceneryArea(char *pszPath)
 	FILE *fpIn;
 	MY_WIN32_FIND_DATA find;
 	HANDLE hFind;
-	int fpos;
+	__int32 fpos;
 			
 	strncpy(szParam, pszPath, MAX_PATH);		
 	fpos = strlen(szParam);
@@ -1022,14 +1022,14 @@ void ScanSceneryArea(char *pszPath)
 		 Data for scenery layer list
 ******************************************************************************/
 
-int nAreas[10000]; // Priorities 1-9999
+__int32 nAreas[10000]; // Priorities 1-9999
 char szTitles[10000][64];
 char szPaths[10000][MAX_PATH];
 BYTE bActive[10000];
-int nArea = 0;
+__int32 nArea = 0;
 
 char szAsoboPaths[1000][MAX_PATH];
-int nAsobo = 0;
+__int32 nAsobo = 0;
 
 /******************************************************************************
 		 ProcessMSFSCommunity
@@ -1126,12 +1126,12 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 void CompleteTables(void)
 {
 	char* psz;
-	int i = 0;
+	__int32 i = 0;
 	while (i < nArea)
 	{
 		nAreas[i] = i + 1;
 		bActive[i] = 0xff;
-		int j = strlen(szPaths[i]);
+		__int32 j = strlen(szPaths[i]);
 		BOOL fCommunity = FALSE;
 		szPaths[i][--j] = 0; // Dispense with last backslash
 		psz = strstr(szPaths[i], "OneStore");
@@ -1253,13 +1253,13 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.02 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.10BETA by Pete Dowson\n");	
 
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
 
 	if (GetFileAttributes("Prepar3D.EXE") != INVALID_FILE_ATTRIBUTES)
-	{	int nVersIndex = 2;
+	{	__int32 nVersIndex = 2;
 		VS_FIXEDFILEINFO *pvsf = 0;
 		char chBlock[16384];
 		UINT cb;
@@ -1318,7 +1318,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
 		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache");
-		int n = strlen(szCfgPath);
+		__int32 n = strlen(szCfgPath);
 
 		strcpy(&szCfgPath[n], "\\UserCfg.opt");
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
@@ -1336,8 +1336,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		HANDLE h = CreateFile(szCopyPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
 		{	DWORD lenHi, len = GetFileSize((HANDLE) h, &lenHi);
-			int l;
-			pContent = malloc(len + 1);
+			__int32 l;
+			pContent = malloc((int) len + 1);
 			ReadFile((HANDLE) h, pContent, len, &l, NULL);
 			pContent[len] = 0;
 			CloseHandle((HANDLE) h);
@@ -1346,12 +1346,12 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
 		{	fOk = FALSE;
-			int lenHi, len = GetFileSize(h, &lenHi);
-			char* pCfg = malloc(len + 1);
+			__int32 lenHi, len = GetFileSize(h, &lenHi);
+			char* pCfg = malloc((int) len + 1);
 			
 			if (pCfg)
 			{
-				int l;
+				__int32 l;
 				ReadFile(h, pCfg, len, &l, NULL);
 				pCfg[len] = 0;
 
@@ -1380,7 +1380,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
 		}
 
-		int fsPathLen = strlen(szCfgPath);
+		__int32 fsPathLen = strlen(szCfgPath);
 		strcpy(&szCfgPath[fsPathLen], "\\Official\\OneStore\\");
 		
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
@@ -1399,9 +1399,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			{	HANDLE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 				if (h)
 				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
-					pLocPak = malloc(len + 1);
+					pLocPak = malloc((int) len + 1);
 					if (pLocPak)
-					{	int l;
+					{	__int32 l;
 						ReadFile(h, pLocPak, len, &l, NULL);
 						pLocPak[len] = 0;
 					}
@@ -1423,8 +1423,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				if (h)
 				{
 					DWORD lenHi, len = GetFileSize((HANDLE)h, &lenHi);
-					int l;
-					pMaterials = malloc(len + 1);
+					__int32 l;
+					pMaterials = malloc((int) len + 1);
 					if (pMaterials)
 					{
 						ReadFile((HANDLE)h, pMaterials, len, &l, NULL);
@@ -1442,7 +1442,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 			ProcessMSFSOfficial(szCfgPath, FALSE);
 			// Add the asobo-airport entries to the end of the main list
-			int i = 0;
+			__int32 i = 0;
 			while (i < nAsobo)
 				strcpy(szPaths[nArea++], szAsoboPaths[i++]);
 		}
@@ -1469,7 +1469,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	{	if (fUserAbort) return 0;
 		sprintf(szArea,"Area.%03d", nArea);	
 		if (GetPrivateProfileString(szArea,"Layer","", szParam, 64, szCfgPath))
-		{	int n = atoi(szParam);
+		{	__int32 n = atoi(szParam);
 			if ((n >= 0) && (n <= 9999) && (nAreas[n] < 0) &&
 					(GetPrivateProfileString(szArea,"Local","", szPaths[n], MAX_PATH, szCfgPath) ||
 						GetPrivateProfileString(szArea,"Remote","", szPaths[n], MAX_PATH, szCfgPath)))
@@ -1491,7 +1491,7 @@ MAINLOOPS:
 	{	if (fUserAbort) return 0;
 		if (nAreas[nArea] >= 0)
 		{	char szAreaWk[512];
-			int len;
+			__int32 len;
 			
 			sprintf(szArea,"Area.%03d", nAreas[nArea]);
 			sprintf(szAreaWk, "%s \x22%s\x22 (Layer=%d)", szArea, szTitles[nArea], nArea);
@@ -1839,7 +1839,7 @@ MAINLOOPS:
 							{	LOCATION locg;
 								double dLat, dLon;
 								char chLetter[4], *pszLetter;
-								int nPark = pg->bPushBackName & 0x3f;
+								__int32 nPark = pg->bPushBackName & 0x3f;
 								BOOL fMyAirlineGate = FALSE;
 			
 								if (nPark <= 11)
@@ -1851,9 +1851,6 @@ MAINLOOPS:
 									pszLetter = &chLetter[0];
 								}
 
-								if (fDebug && (pg->bCodeCount & 0x7F))
-									fprintf(fpAFDS, "### Airline Code Count = %d\n", pg->bCodeCount & 0x7f);
-								
 								SetLocPos(&locg, 0,
 									pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
 									pg3 ? pg3->nLon : pg2 ? pg2->nLon : pg->nLon, 0, 0, &dLat, &dLon);								
@@ -1898,7 +1895,7 @@ MAINLOOPS:
 								}
 
 								w++;
-								pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) +
+								pg = (NGATE *) ((BYTE *) pg + (4 * (int) (pg->bCodeCount & 0x7f)) +
 										(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
 								if (pgh->wId == OBJTYPE_MSFSTAXIPARK)
 									pg = (NGATE*)((BYTE*)pg + 20); // 20 additional bytes
@@ -2014,7 +2011,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.02");
+			SetWindowText(hDlg, "Make Runways: Version 5.10BETA");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2041,7 +2038,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 				case 2:
 					sprintf(wk, "Total airports = %d, runways = %d", ulTotalAPs, ulTotalRwys);
 					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS1), wk);
-					int x = sprintf(wk, "Number of BGLs = %d", ulTotalBGLs);
+					__int32 x = sprintf(wk, "Number of BGLs = %d", ulTotalBGLs);
 					if (ulTotalBytes)
 						sprintf(&wk[x], ", Bytes scanned = %d", ulTotalBytes);
 					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS2), wk);
@@ -2157,6 +2154,13 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 			pch += 6;
 		}
 
+		else if (_strnicmp(&pch[1], "DECC", 4) == 0)
+
+		{
+			fDecCoords = TRUE;
+			pch += 5;
+		}
+
 		else if (pch[1] == '>')
 
 		{
@@ -2233,7 +2237,7 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 			DWORD dwErr = GetLastError();
 			DebugBreak();
 		}
-		ShowWindow(hWnd, SW_HIDE);
+		else ShowWindow(hWnd, SW_HIDE);
 	}
 	else
 		hWnd = CreateDialog(hInstance, "MyDlg", 0, DlgProc);
@@ -2276,12 +2280,12 @@ void UpdateTransitionAlts(void)
 
 	fseek(fpM4, 0, SEEK_END);
 	nLenM4 = ftell(fpM4);
-	chM4 = malloc(2*nLenM4); // Room for expansion
+	chM4 = malloc(2*(int) nLenM4); // Room for expansion
 	fseek(fpM4, 0, SEEK_SET);
 
 	fseek(fpDAT, 0, SEEK_END);
 	nLenDAT = ftell(fpDAT);
-	chDAT = malloc(nLenDAT+1);
+	chDAT = malloc((int) nLenDAT+1);
 	fseek(fpDAT, 0, SEEK_SET);
 
 	nLenM4 = fread(chM4, 1, nLenM4, fpM4);

@@ -3,6 +3,8 @@ extern char *pPathName;
 extern char *pSceneryName;
 extern char* pMaterials;
 
+#pragma pack(push, 1)
+
 typedef struct _NSECTS
 {
 	DWORD nObjType;			//  0 object type, see constants above
@@ -29,21 +31,21 @@ typedef struct _NBGLHDR
 	WORD wResvd1;			//  6 reserved (0x0000)
 	BYTE szCrc[6];			//  8 48-bits CRC or what ???
 	BYTE szUnk1[2];			// 14 always 0xC301 .............C6 01 in FSX (D6 01 in MSFS)
-	int nMagic;				// 16 magic number ? - 13451555 ... 134551555
+	__int32 nMagic;				// 16 magic number ? - 13451555 ... 134551555
 	DWORD nObjects;			// 20 number of object groups within file
-	int nLatMax;			// 24 latitude max ???
-	int nLatMin;			// 28 latitude min ???
-	int nLonMax;			// 32 longitude max ???
-	int nLonMin;			// 36 longitude min ???
-	int nUnk2;				// 40 unknown integer 2
-	int nUnk3;				// 44 unknown integer 3
+	__int32 nLatMax;			// 24 latitude max ???
+	__int32 nLatMin;			// 28 latitude min ???
+	__int32 nLonMax;			// 32 longitude max ???
+	__int32 nLonMin;			// 36 longitude min ???
+	__int32 nUnk2;				// 40 unknown integer 2
+	__int32 nUnk3;				// 44 unknown integer 3
 	BYTE lpResvd[8];		// 48 reserved
 	NSECTS sects[NSECTS_PER_FILE];		// Allow fr max number of sects likely ???
 } NBGLHDR;
 
 typedef struct _NOBJ
 {	DWORD unk;
-	int chunkctr;
+	__int32 chunkctr;
 	DWORD chunkoff;
 	DWORD chunksize;
 } NOBJ;
@@ -105,15 +107,15 @@ typedef struct _NAPT
 	BYTE nApproaches;		//	9 No. of approaches
 	BYTE nAprons;			// 10 No. of aprons + 128 for "delete airport"
 	BYTE nHelipads;			// 11 No. of helipads
-	int nLon;				// 12 longitude, packed format
-	int nLat;				// 16 latitude, packed format
-	int nAlt;				// 20 altitude * 1000
-	int nTowerLon;			// 24 tower longitude, courtesy of Marco Sinchetto
-	int nTowerLat;			// 28 tower latitude
-	int nTowerAlt;			// 32 tower altitude meters * 1000
+	__int32 nLon;				// 12 longitude, packed format
+	__int32 nLat;				// 16 latitude, packed format
+	__int32 nAlt;				// 20 altitude * 1000
+	__int32 nTowerLon;			// 24 tower longitude, courtesy of Marco Sinchetto
+	__int32 nTowerLat;			// 28 tower latitude
+	__int32 nTowerAlt;			// 32 tower altitude meters * 1000
 	float fMagVar;			// 36 magnetic deviation
 	DWORD nId;				// 40 packed ICAO ID (0 = 65)
-	int nUnk4;				// 44 unknown integer 4
+	__int32 nUnk4;				// 44 unknown integer 4
 	DWORD nServices;		// 48 services, if any, otherwise 0x0
 	DWORD dwUnknown;		// 52 FSX addition?
 } NAPT;
@@ -138,9 +140,9 @@ typedef struct NRWY
 	BYTE bEndDesignator;	// 11 runway end designator
 	DWORD nPrimaryIlsId;	// 12 primary ILS id in packed format
 	DWORD nSecondaryIlsId;	// 16 secondary ILS id in packed format
-	int nLon;				// 20 longitude in packed format
-	int nLat;				// 24 latitude in packed format
-	int nAlt;				// 28 altitude, meters * 1000
+	__int32 nLon;				// 20 longitude in packed format
+	__int32 nLat;				// 24 latitude in packed format
+	__int32 nAlt;				// 28 altitude, meters * 1000
 	float fLength;			// 32 length in meters
 	float fWidth;			// 36 width in meters
 	float fHeading;			// 40 approach heading
@@ -175,9 +177,9 @@ typedef struct _NSTART
 	DWORD nLen;				//  2 record length
 	BYTE num;				//  6 was un1 lpUn1;				// see above
 	BYTE des;				//  7 un2 lpUn2;				// see above ??????? flags
-	int nLon;				//  8 longitude in packed format
-	int nLat;				// 12 latitude in packed format
-	int nAlt;				// 16 altitude, meters * 1000
+	__int32 nLon;				//  8 longitude in packed format
+	__int32 nLat;				// 12 latitude in packed format
+	__int32 nAlt;				// 16 altitude, meters * 1000
 	float fHeading;			// 20 heading in degrees
 } NSTART;
 
@@ -188,7 +190,7 @@ typedef struct _NCOMM
 	DWORD nLen;				// 2 length of record in bytes
 	BYTE bCommType;			// 6 comm type, see above
 	BYTE nUnknown;
-	int nFreq;				// 8 frequency * 1000000
+	__int32 nFreq;				// 8 frequency * 1000000
 	// variable length name follows
 } NCOMM;
 
@@ -235,14 +237,14 @@ typedef struct _NILS
 	DWORD nLen;				//  2 length of record in bytes
 	BYTE bType;				//  6 type - ILS is 0x4
 	BYTE bFlags;			//  7 ils flags
-	int nLon;				//  8 longitude in packed format
-	int nLat;				// 12 latitude in packed format
-	int nAlt;				// 16 altitude, meters * 1000
-	int nFreq;				// 20 frequency * 1000000
+	__int32 nLon;				//  8 longitude in packed format
+	__int32 nLat;				// 12 latitude in packed format
+	__int32 nAlt;				// 16 altitude, meters * 1000
+	__int32 nFreq;				// 20 frequency * 1000000
 	float fRange;			// 24 range in meters
 	float fMagVar;			// 28 magnetic deviation
-	int nId;				// 32 packed ICAO ID - base 0x42
-	int nRegion;			// 36 packed region ???
+	__int32 nId;				// 32 packed ICAO ID - base 0x42
+	__int32 nRegion;			// 36 packed region ???
 	NILSLOC loc;
 } NILS;
 
@@ -308,8 +310,8 @@ typedef struct _NGATE
 	// ######################  NOTE that I use top bit as "Jetway" flag!
 	float fRadius;			// radius of parking (in meters)
 	float fHeading;			// heading in degrees
-	int nLon;				// longitude in packed format
-	int nLat;				// latitude in packed format
+	__int32 nLon;				// longitude in packed format
+	__int32 nLat;				// latitude in packed format
 } NGATE;
 
 typedef struct _NJETWAY
@@ -332,8 +334,8 @@ typedef struct _NGATE2
 	float fRadius;			// radius of parking (in meters)
 	float fHeading;			// heading in degrees
 	BYTE bUnknown[16];		// Added in FSX
-	int nLon;				// longitude in packed format
-	int nLat;				// latitude in packed format
+	__int32 nLon;				// longitude in packed format
+	__int32 nLat;				// latitude in packed format
 } NGATE2;
 
 typedef struct _NGATE3
@@ -349,9 +351,9 @@ typedef struct _NGATE3
 	float fRadius;			// radius of parking (in meters)
 	float fHeading;			// heading in degrees
 	BYTE bUnknown[16];		// Added in FSX
-	int nLon;				// longitude in packed format
-	int nLat;				// latitude in packed format
-	int nAlt;
+	__int32 nLon;				// longitude in packed format
+	__int32 nLat;				// latitude in packed format
+	__int32 nAlt;
 } NGATE3;
 
 #define BIT_DELETE_ALL_APPROACHES		0x01
@@ -385,8 +387,8 @@ typedef struct _NTAXI
 	BYTE bCenterFlags;		// 0006 - centerline flags, see constants above
 	BYTE bSurface;			// 0007 - runway surface
 	float fWidth;			// 0008 - width in meters
-	int nWeightLimit;		// 0012 - weigth limit
-	int nUnk;				// 0016 - unknown integer - terminator
+	__int32 nWeightLimit;		// 0012 - weigth limit
+	__int32 nUnk;				// 0016 - unknown integer - terminator
 } NTAXI;
 
 typedef struct _NEWNTAXI
@@ -400,8 +402,8 @@ typedef struct _NEWNTAXI
 	BYTE bCenterFlags;		// 0006 - centerline flags, see constants above
 	BYTE bSurface;			// 0007 - runway surface
 	float fWidth;			// 0008 - width in meters
-	int nWeightLimit;		// 0012 - weigth limit
-	int nUnk;				// 0016 - unknown integer - terminator
+	__int32 nWeightLimit;		// 0012 - weigth limit
+	__int32 nUnk;				// 0016 - unknown integer - terminator
 	BYTE bUnk[16];			// 0020 - 16 extra bytes unknown use
 } NEWNTAXI;
 
@@ -416,11 +418,11 @@ typedef struct _NEWNTAXI2
 	BYTE bCenterFlags;		// 0006 - centerline flags, see constants above
 	BYTE bSurface;			// 0007 - runway surface
 	float fWidth;			// 0008 - width in meters
-	int nWeightLimit;		// 0012 - weigth limit
-	int nUnk;				// 0016 - unknown integer - terminator
+	__int32 nWeightLimit;		// 0012 - weigth limit
+	__int32 nUnk;				// 0016 - unknown integer - terminator
 	BYTE bUnk[16];			// 0020 - 16 extra bytes unknown use
-	int nflatten;
-	// ACCORDING TO Jon: int nsurfaceQuery;
+	__int32 nflatten;
+	// ACCORDING TO Jon: __int32 nsurfaceQuery;
 } NEWNTAXI2;
 
 typedef struct _MSFSNTAXI
@@ -434,7 +436,7 @@ typedef struct _MSFSNTAXI
 	BYTE bCenterFlags;		// 0006 - centerline flags, see constants above
 	BYTE bOldSurface;		// 0007 - was runway surface, now GUID below
 	float fWidth;			// 0008 - width in meters
-	int nWeightLimit;		// 0012 - weigth limit
+	__int32 nWeightLimit;		// 0012 - weigth limit
 	BYTE bUnk1[8];			// 0016 - extra bytes unknown use
 	BYTE guidSurface[16];	// 0024 - GUID for surface material
 	BYTE bUnk2[6];			// 0040 - unknown
@@ -450,11 +452,11 @@ typedef struct _NTAXIPT
 	BYTE bOrientation;		// 0001 - 0: forward, 1: reverse
 	WORD wUnk1;				// 0002 - unknown word 1
 	union
-	{	int nLon;			// 0004 - longitude in packed format
+	{	__int32 nLon;			// 0004 - longitude in packed format
 		float fLon;
 	};
 	union
-	{	int nLat;				// 0008 - latitude in packed format
+	{	__int32 nLat;				// 0008 - latitude in packed format
 		float fLat;
 	};
 } NTAXIPT;
@@ -464,14 +466,14 @@ typedef struct _NEWTAXIPT
 	BYTE bOrientation;		// 0001 - 0: forward, 1: reverse
 	WORD wUnk1;				// 0002 - unknown word 1
 	union
-	{	int nLon;			// 0004 - longitude in packed format
+	{	__int32 nLon;			// 0004 - longitude in packed format
 		float fLon;
 	};
 	union
-	{	int nLat;				// 0008 - latitude in packed format
+	{	__int32 nLat;				// 0008 - latitude in packed format
 		float fLat;
 	};
-	int nAltitude;
+	__int32 nAltitude;
 } NEWTAXIPT;
 
 typedef struct _NTAXINM
@@ -490,12 +492,12 @@ typedef struct _NREGION
 	WORD wCityCount;		// 0012 - count of cities
 	WORD wAirportCount;		// 0014 - count of airports
 	WORD wIcaoCount;		// 0016 - count of ICAOs
-	int nRegionPtr;			// 0018 - relative offset to region name
-	int nCountryPtr;		// 0022 - relative offset to country name
-	int nStatePtr;			// 0026 - relative offset to state name
-	int nCityPtr;			// 0030 - relative offset to city name
-	int nAirportPtr;		// 0034 - relative offset to airport names
-	int nIcaoPtr;			// 0038 - relative offset to ICAO IDs
+	__int32 nRegionPtr;			// 0018 - relative offset to region name
+	__int32 nCountryPtr;		// 0022 - relative offset to country name
+	__int32 nStatePtr;			// 0026 - relative offset to state name
+	__int32 nCityPtr;			// 0030 - relative offset to city name
+	__int32 nAirportPtr;		// 0034 - relative offset to airport names
+	__int32 nIcaoPtr;			// 0038 - relative offset to ICAO IDs
 } NREGION;
 
 // icao id entry (20 bytes)
@@ -532,9 +534,9 @@ typedef struct tag_helipad_t
 	BYTE g;					// rgb
 	BYTE b;					// rgb
 	BYTE a;					// alpha
-	int nLon;				// longitude in packed format
-	int nLat;				// latitude in packed format
-	int nAlt;				// altitude, meters * 1000
+	__int32 nLon;				// longitude in packed format
+	__int32 nLat;				// latitude in packed format
+	__int32 nAlt;				// altitude, meters * 1000
 	float fLength;			// helipad length in meters
 	float fWidth;			// helipad width in meters
 	float fHeading;			// helipad heading
@@ -583,3 +585,5 @@ typedef struct _NAPRON2HDR // triangles apron type
 } NAPRON2HDR;
 
 extern DWORD ulTotalBGLs, ulTotalBytes;
+
+#pragma pack(pop)

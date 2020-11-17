@@ -5,6 +5,8 @@
          Structs
 ******************************************************************************/
 
+#pragma pack(push, 1)
+
 typedef struct _nbglhdr
 {	WORD id; // == 0x0201
 	WORD vers; // == 0x1992
@@ -136,6 +138,8 @@ typedef struct _nilsvor
 					// ils1id or ils2id in runway record
 	DWORD regapt; // bits 0-10 region id, 11-31 airport id (ILS only)
 } NILSVOR;
+
+#pragma pack(pop)
 
 /******************************************************************************
          End of NewBGLs.h

@@ -23,6 +23,8 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmd
          Structs
 ******************************************************************************/
 
+#pragma pack(push, 1)
+
 typedef struct _MY_WIN32_FIND_DATA {
     DWORD dwFileAttributes;
     FILETIME ftCreationTime;
@@ -141,7 +143,7 @@ typedef union
 	{	IF64 lat;
 		IF64 lon;
 		unsigned short sparey;
-		int elev;
+		__int32 elev;
 		IF48 hdg;
 
 		union
@@ -164,11 +166,11 @@ typedef union
 			};
 
 			struct	// LOC_NAV
-			{	unsigned int nfreq;
-				unsigned int ntype;
-				unsigned int nclass;
-				unsigned int nflags;
-				unsigned int spare4;
+			{	unsigned __int32 nfreq;
+				unsigned __int32 ntype;
+				unsigned __int32 nclass;
+				unsigned __int32 nflags;
+				unsigned __int32 spare4;
 				char id[8]; // Nav id
 			};
 		};
@@ -226,7 +228,7 @@ typedef struct
 {	char chICAO[4];
 	float fLat;
 	float fLong;
-	int nAlt;
+	__int32 nAlt;
 	unsigned short Atis;
 } APDATA;
 
@@ -305,39 +307,42 @@ typedef struct
 	// 28
 } HELI;
 
+#pragma pack(pop)
+
 extern BOOL fMSFS;
 extern HELI helipads[10000];
-extern int nHelipadCtr;
+extern __int32 nHelipadCtr;
 extern BOOL fDebug;
-extern int errnum;
-extern int nComms;
+extern __int32 errnum;
+extern __int32 nComms;
 
 extern FILE *fpAFDS;
 extern RWYLIST *pR, *pRlast;
 extern char chLine[];
-extern void DecodeRwy(unsigned long n, unsigned long c, char *pch, int offs, int size);
+extern void DecodeRwy(unsigned long n, unsigned long c, char *pch, __int32 offs, __int32 size);
 extern void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD size);
 extern void WritePosition(LOCATION *ploc, BOOL fWithAlt);
 extern void ToAngle(ANGLE *p, long i, unsigned long f, short type);
 extern void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr);
-extern void SetLocPos(LOCATION *pLoc, int alt, int lat, int lon, float *pflat, float *pflon, double *pdLat, double *pdLon);
+extern void SetLocPos(LOCATION *pLoc, __int32 alt, __int32 lat, __int32 lon, float *pflat, float *pflon, double *pdLat, double *pdLon);
 extern float ToFeet(long alt);
 extern char *str2ascii(char *psz);
 
 extern HWND hWnd;
 extern BOOL fUserAbort, fNewAirport;
 extern BOOL fNoDrawHoldConvert;
-extern int fFS9;					
+extern __int32 fFS9;					
 extern DWORD ulTotalAPs, ulTotalRwys;
 extern char *pNextAirportName, *pNextCityName, *pNextStateName, *pNextCountryName, *pNextPathName;
 
 extern void DeleteComms(char *pchICAO);
-extern void AddComms(char *pchICAO, int nCommstart, int nCommEnd, int nCommDelStart, int nCommDelEnd, char *pApName);
+extern void AddComms(char *pchICAO, __int32 nCommstart, __int32 nCommEnd, __int32 nCommDelStart, __int32 nCommDelEnd, char *pApName);
 extern void MakeCommsFile(void);
 extern void MakeHelipadsFile(void);
 
 extern const char *szNRwySurf[];
 extern char* pLocPak;
+extern BOOL fDecCoords;
 
 /******************************************************************************
          End of MakeRwys.h

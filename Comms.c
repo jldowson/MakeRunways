@@ -9,33 +9,33 @@
 
 typedef struct 
 {	char chICAO[4];
-	int nStart;
-	int nEnd;
-	int nStartDel;
-	int nEndDel;
+	__int32 nStart;
+	__int32 nEnd;
+	__int32 nStartDel;
+	__int32 nEndDel;
 	char *pApName;
 } COMMSLIST;
 
 typedef struct
-{	int nType;
+{	__int32 nType;
 	char chFreq[8];
 	char szName[256];
 } COMMSENTRY;
 
 COMMSLIST *pCommsList = 0;
-int nComms = 0;
+__int32 nComms = 0;
 
 /******************************************************************************
          DeleteComms
 ******************************************************************************/
 
 void DeleteComms(char *pchICAO)
-{	int i = 0;
+{	__int32 i = 0;
 	if (!pCommsList) return;
 
 	while (i < nComms)
 	{	if (*((DWORD *) &pCommsList[i].chICAO[0]) == *((DWORD *) pchICAO))
-		{	int n = nComms - i - 1;
+		{	__int32 n = nComms - i - 1;
 			if (n) memmove(&pCommsList[i], &pCommsList[i+1], n * sizeof(COMMSLIST));
 			nComms--;
 			if (i) i--;
@@ -63,9 +63,9 @@ char* FindAirportName(char* pchICAO)
 	return NULL;
 }
 
-void AddComms(char *pchICAO, int nCommStart, int nCommEnd, int nCommDelStart, int nCommDelEnd, char *pApName)
+void AddComms(char *pchICAO, __int32 nCommStart, __int32 nCommEnd, __int32 nCommDelStart, __int32 nCommDelEnd, char *pApName)
 {	static BOOL ftm = TRUE;
-	int i = 0, n;
+	__int32 i = 0, n;
 
 	if (!pCommsList)
 		pCommsList = malloc(1000000 * sizeof(COMMSLIST));
@@ -109,7 +109,7 @@ void ConvertCOMfreq(char* pFreq, char* pResult)
 		"05", "10", "15", "30", "35", "40", "55", "60", "65", "80", "85", "90" };
 	static char *pchOld[12] = {
 		"0", "0", "2", "2", "2", "5", "5", "5", "7", "7", "7", "0" };
-	int i;
+	__int32 i;
 
 	strncpy(pResult, pFreq, 7);
 	
@@ -129,7 +129,7 @@ void MakeCommsFile(void)
 	FILE* pfx = fopen("f5x.csv", "wb");
 	FILE* pfx2 = fopen("f4x.csv", "wb");
 	FILE *pt = fopen("runways.txt","rb");
-	int i = 0, j = 0;
+	__int32 i = 0, j = 0;
 	COMMSENTRY c[CLIST_MAX];
 	char *pch2 = 0, *pch = 0, *pchData = 0;
 	char chPrevICAO[5], *pchICAO = 0;
@@ -149,7 +149,7 @@ void MakeCommsFile(void)
 		while (i <= nComms)
 		{		if ((i >= nComms) || (*((DWORD *) &pCommsList[i].chICAO[0]) != *((DWORD *) &pchICAO[0])))
 				{	// Output results for this ICAO
-					int t, k = j-1;
+					__int32 t, k = j-1;
 					BOOL fAddName = FALSE;
 
 					errnum = 1;
@@ -165,8 +165,8 @@ void MakeCommsFile(void)
 					if (fAddName)
 					{	BOOL fDoneName = FALSE;
 						char chFreqs2[14][8];
-						// was static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, -1, -1, -1, 1, -1 };
-						static int nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, 1, 1, 1, 1, -1 };
+						// was static __int32 nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, -1, -1, -1, 1, -1 };
+						static __int32 nEquivs[16] = { -1, 0, 5, 4, 10, 2, 3, 8, 6, 7, -1, 1, 1, 1, 1, -1 };
 						memset(chFreqs2, 0, sizeof(chFreqs2));
 
 						errnum = 3;
@@ -263,7 +263,7 @@ void MakeCommsFile(void)
 				if (i < nComms)
 				{	// See to individual deletions first ...
 					if (j && pCommsList[i].nStartDel && pCommsList[i].nEndDel)
-					{	int nLen = pCommsList[i].nEndDel - pCommsList[i].nStartDel;
+					{	__int32 nLen = pCommsList[i].nEndDel - pCommsList[i].nStartDel;
 						char *pchData = malloc(nLen+1);
 						if (pchData)
 						{	char *pch = pchData;
@@ -277,7 +277,7 @@ void MakeCommsFile(void)
 							errnum = 14;
 
 							while (1)
-							{	int j2 = 0;
+							{	__int32 j2 = 0;
 
 								pch = strstr(pch, "COM:");
 								if (!pch) break;
@@ -323,7 +323,7 @@ void MakeCommsFile(void)
 					
 					// Now add details
 					if (pCommsList[i].nStart && pCommsList[i].nEnd)
-					{	int nLen = pCommsList[i].nEnd - pCommsList[i].nStart;
+					{	__int32 nLen = pCommsList[i].nEnd - pCommsList[i].nStart;
 						pchData = malloc(nLen+1);
 						if (pchData)
 						{	pch = pchData;
@@ -353,7 +353,7 @@ void MakeCommsFile(void)
 
 								// If already same type and freq, delete previous one
 								if (j)
-								{	int j2;
+								{	__int32 j2;
 									errnum = 25;
 
 									for (j2 = 0; j2 < j; j2++)
