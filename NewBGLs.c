@@ -2980,8 +2980,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char *pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					//pTpath[w].wEnd &= 0x0fff;
-					//pTpath[w].wStart &= 0x0fff;
+					pTpath[w].wEnd &= 0x0fff;
+					pTpath[w].wStart &= 0x0fff;
 					pTpath[w].bDrawFlags &= 0x0f;
 
 					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n", 
@@ -3005,7 +3005,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char *pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					// Removed these for MSFS
+					// Removed these for New BGL format
 					//pNTpath[w].wEnd &= 0x0fff;
 					//pNTpath[w].wStart &= 0x0fff;
 					pNTpath[w].bDrawFlags &= 0x0f;
@@ -3031,8 +3031,9 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				{	// For now just dump to txt file:
 					static char* pszPathTypes[] = { "?", "Taxi","Runway","Parking","Path","Closed" };
 
-					pNTpath3[w].wEnd &= 0x0fff;
-					pNTpath3[w].wStart &= 0x0fff;
+					// Removed these for MSFS
+					//pNTpath3[w].wEnd &= 0x0fff;
+					//pNTpath3[w].wStart &= 0x0fff;
 					pNTpath3[w].bDrawFlags &= 0x0f;
 
 					fprintf(fpAFDS, "          Taxipath (%s%d):  Type %d (%s), Start#=%d, End#=%s%d, Wid=%.2fm\n",

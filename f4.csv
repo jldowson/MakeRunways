@@ -1173,7 +1173,7 @@
 5N2,Prentice Mun,0,0,0,0,123.00,123.00,0,0
 5N4,Sky Haven,0,0,0,0,0,122.90,0,0
 5N5,Kirkwood,0,0,0,0,122.80,122.80,0,0
-5N7,Hatöz,0,0,0,0,0,122.90,0,0
+5N7,Hatö!,0,0,0,0,0,122.90,0,0
 5N8,Casselton Robert Miller Rgnl,0,0,0,0,122.80,122.80,120.40,120.40
 5NC2,Sugar Valley,0,0,0,0,123.00,123.00,0,0
 5NK,Naknek,0,0,0,0,0,122.80,0,0
@@ -2414,7 +2414,7 @@ CSL3,Lac-A-La-Tortue,0,122.50,0,0,122.70,122.70,0,0
 CSM3,Thetford Mines,0,0,0,0,122.80,0,0,0
 CSM4,Ste Julienne,0,0,0,0,0,123.20,0,0
 CSM5,St-Michel-Des-Saints,0,0,0,0,0,123.20,0,0
-CSN3,St-Jzärzöme Airport,0,119.10,119.10,119.10,0,0,0,0
+CSN3,St-J!är!öme Airport,0,119.10,119.10,119.10,0,0,0,0
 CSN5,Stanhope,0,0,0,0,0,123.20,0,0
 CSQ3,Valcourt,0,0,0,0,122.80,121.80,0,0
 CSR,Campbell,0,0,0,0,0,127.45,0,0
@@ -2984,7 +2984,7 @@ EBAM,Amougies,0,119.75,0,0,0,0,0,0
 EBAR,Arlon-Sterpenich ULM,0,123.42,0,0,0,0,0,0
 EBAV,Avernas-le-Bauduin ULM,0,129.97,0,0,0,0,0,0
 EBAW,Deurne,124.20,0,121.90,119.70,0,0,0,0
-EBBN,Bzöllingen ULM,0,118.97,0,0,0,0,0,0
+EBBN,B!öllingen ULM,0,118.97,0,0,0,0,0,0
 EBBR,Brussels National,121.75,121.95,118.05,118.60,0,0,127.57,126.62
 EBBY,Baisy-Thy ULM,0,132.00,0,0,0,0,0,0
 EBBZ,Buzet ULM,0,118.75,0,0,0,0,0,0
@@ -3925,7 +3925,7 @@ ESGJ,Jonkoping,0,0,118.25,118.25,0,0,0,0
 ESGK,Falkoping,0,0,0,0,123.65,0,0,0
 ESGL,Lidkoping AB,0,0,0,0,124.45,0,0,0
 ESGM,Oresten,0,0,0,0,0,123.20,0,0
-ESGP,Szöve,0,0,119.05,119.05,0,0,0,0
+ESGP,S!öve,0,0,119.05,119.05,0,0,0,0
 ESGR,Skovde,0,0,0,0,122.32,0,0,0
 ESGS,Nasinge,0,0,0,0,0,123.55,0,0
 ESGT,Trollhattan-Vanersborg,0,0,122.72,122.72,0,0,0,0
@@ -4014,7 +4014,7 @@ ESSW,Vastervik,0,0,0,0,0,122.10,0,0
 ESSX,Johannisberg,0,0,0,0,0,123.65,0,0
 ESSZ,Vangso,0,0,0,0,0,123.35,0,0
 ESTA,Angelholm AB,0,0,127.10,132.45,0,0,0,0
-ESTF,Fjzöllbacka Anra Airport,0,0,123.20,123.20,0,0,0,0
+ESTF,Fj!öllbacka Anra Airport,0,0,123.20,123.20,0,0,0,0
 ESTL,Ljungbyhed AB,132.75,0,121.65,129.70,0,0,0,0
 ESTO,Tomelilla,0,0,0,0,0,123.65,0,0
 ESUB,Arbra,0,0,0,0,0,123.20,0,0
@@ -7183,7 +7183,7 @@ LELN,Leon,0,0,122.10,122.10,0,0,121.27,121.27
 LEMD,Barajas,118.25,130.07,121.85,118.07,0,0,118.40,124.22
 LEMG,Malaga,120.37,121.87,121.70,118.15,0,0,118.45,123.85
 LEMH,Menorca,129.15,0,121.75,118.20,0,0,119.65,119.65
-LEMI,Base Azärea Las Navas,0,0,121.75,121.32,0,0,125.02,130.30
+LEMI,Base A!ärea Las Navas,0,0,121.75,121.32,0,0,125.02,130.30
 LEPA,Palma De Mallorca,119.25,123.87,121.70,118.30,0,0,118.95,119.40
 LEPP,Pamplona,0,0,121.70,118.20,0,0,118.20,118.20
 LERJ,Logrono,0,0,121.70,0,0,0,118.57,118.57
@@ -7415,7 +7415,7 @@ LFSM,Courcelles,0,0,0,0,132.02,0,0,0
 LFSN,Essey,0,0,0,0,119.60,0,0,0
 LFSP,Pontarlier,0,0,0,0,0,0,126.55,126.55
 LFST,Entzheim,126.92,0,121.80,119.25,119.45,0,119.57,134.57
-LFTZ,La Mzöle - Saint-Tropez Airport,0,0,0,0,118.12,0,0,0
+LFTZ,La M!öle - Saint-Tropez Airport,0,0,0,0,118.12,0,0,0
 LFVM,Miquelon,0,0,0,0,118.27,0,0,0
 LFVP,Saint Pierre,0,0,119.10,118.50,0,0,118.50,119.10
 LFXB,Thenac AB,0,0,0,0,122.40,0,0,0
@@ -9379,7 +9379,7 @@ SAZV,Villa Gesell,0,0,119.00,119.00,0,0,119.00,119.00
 SAZW,Cutral-Co,0,0,0,0,0,121.90,0,0
 SAZY,Aviador Carlos Campos(Neuquen),0,0,119.60,118.20,0,0,118.20,119.60
 SBAA,Conceicao Do Araguaia,0,0,0,0,0,125.70,0,0
-SBAC,Afuzä Municipal Airport,0,131.25,0,0,0,0,0,0
+SBAC,Afu!ä Municipal Airport,0,131.25,0,0,0,0,0,0
 SBAE,Bauru-Arealva,0,0,0,0,131.85,0,0,0
 SBAF,Campo Delio Jardim De Mattos,0,118.90,121.85,0,0,0,0,0
 SBAM,Amapa,0,0,0,0,0,125.70,0,0
@@ -9773,7 +9773,7 @@ SPYL,Capitan Montes,0,0,0,0,119.50,0,0,0
 SPZA,Maria Reiche Neuman,132.50,0,121.90,118.10,118.10,0,0,0
 SPZO,Tnte Fap Alejandro Velazco Ast,127.00,0,121.90,118.10,0,0,120.60,120.60
 SRV,Stoney River 2,0,0,0,0,0,122.90,0,0
-SSGG,Fazenda Jacarzä de Chifre Airport,0,0,0,0,131.70,0,0,0
+SSGG,Fazenda Jacar!ä de Chifre Airport,0,0,0,0,131.70,0,0,0
 SSPG,Paranagua,0,0,0,0,0,0,119.60,119.60
 SUAA,Angel S Adami Intl,0,0,122.10,118.40,0,0,0,0
 SUAG,Artigas Intl,0,0,122.10,122.10,0,0,0,0
@@ -9827,7 +9827,7 @@ SVSO,Mayor Buenaventura Vivas Intl,132.55,0,121.90,122.30,0,0,0,0
 SVSP,Sub Teniente Nestor Arias,0,0,118.60,118.60,0,0,0,0
 SVSR,San Fernando De Apure,0,0,121.90,118.15,0,0,132.00,132.00
 SVST,San Tome,0,0,118.85,118.85,0,0,0,0
-SVSZ,Santa Bzärbara del Zulia Airport,132.85,0,118.20,118.20,0,0,0,0
+SVSZ,Santa B!ärbara del Zulia Airport,132.85,0,118.20,118.20,0,0,0,0
 SVVA,Arturo Michelena Intl,0,0,121.90,118.90,0,0,132.00,132.00
 SVVG,Juan Pablo Perez Alfonzo,132.50,0,118.75,118.75,0,0,0,0
 SVVL,Dr. Antonio Nicolas Briceno,132.50,121.90,122.80,122.80,0,0,0,0
