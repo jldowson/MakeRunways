@@ -737,14 +737,14 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 		len2--;
 
 	strcpy(&szPathName[len2], pszCfgPaths[nVers]);
-	hFile = CreateFile(szPathName, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-			
+	
+	hFile = CreateFile(szPathName, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);		
 	if (hFile != INVALID_HANDLE_VALUE)
 	{	CloseHandle(hFile);
 		strcpy(psz, szPathName);
 		return nVers;
 	}
-
+	
 	szPathName[len2] = 0;
     
 	// Try to find \\Microsoft\\FSX\\SCENERY.CFG for other users
@@ -1219,6 +1219,17 @@ void CompleteTables(void)
 		pContent = 0;
 	}
 
+	FILE *fpList = fopen("SceneryList.txt", "w");
+	if (fpList)
+	{	int i = 0;
+		while (i < nArea)
+		{	fprintf(fpList, "%03d\t%s\t%s\n\t%s\n",
+				i + 1, bActive[i] ? "Active" : "Disabled",
+				szTitles[i], szPaths[i]);
+			i++;
+		}
+		fclose(fpList);
+	}
 }
 
 /******************************************************************************
@@ -1253,8 +1264,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.10BETA2 by Pete Dowson\n");	
-
+	fprintf(fpAFDS, "Make Runways File: Version 5.11 by Pete Dowson\n");	
+	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
 
@@ -1300,7 +1311,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	}
 
 	// fprintf(fpAFDS, "\nfFSX = %d, fDoMSFS = %d\n", fFSX, fDoMSFS);
-
+	
 	if ((fFSX < 0) && fLocal)
 	{	fMSFS = TRUE;
 		nVersion = 7;
@@ -1321,6 +1332,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		__int32 n = strlen(szCfgPath);
 
 		strcpy(&szCfgPath[n], "\\UserCfg.opt");
+		
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// try Steam
 			strcpy(szCfgPath, getenv("APPDATA"));
@@ -1328,7 +1340,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			n = strlen(szCfgPath);
 			strcpy(&szCfgPath[n], "\\UserCfg.opt");
 		}
-
+		
 		// Get content list (for disable options)
 		strcpy(szCopyPath, szCfgPath);
 		strcpy(&szCopyPath[n], "\\content.xml");
@@ -1342,7 +1354,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			pContent[len] = 0;
 			CloseHandle((HANDLE) h);
 		}
-
+		
 		h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
 		{	fOk = FALSE;
@@ -2011,7 +2023,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.10BETA2");
+			SetWindowText(hDlg, "Make Runways: Version 5.11");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2085,7 +2097,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
          WinMain
 ******************************************************************************/
 
-long CALLBACK NullWndProc(HWND hwnd, UINT message, UINT wParam, LONG lParam)
+LRESULT CALLBACK NullWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {	switch (message)	
 	{	case WM_CLOSE:
 			DestroyWindow(hwnd);
@@ -2219,16 +2231,23 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 	if (fQuiet)
 	{
 		WNDCLASS Class;
-		char szAppName[] = "MakeRunways";
+		char szAppName[] = "MakeRwys";
 		// Register the class for our Window
 		memset(&Class, 0, sizeof(WNDCLASS));
 
 		Class.hCursor = LoadCursor(NULL, IDC_ARROW);
+		Class.hIcon = NULL;
+		Class.lpszMenuName = (LPSTR)NULL;
 		Class.lpszClassName = szAppName;
-		Class.hInstance = hInstance;
+		Class.hbrBackground = NULL; //(HBRUSH) (COLOR_BTNFACE + 1);
+		Class.hInstance = hInst;
 		Class.style = CS_HREDRAW | CS_VREDRAW;
 		Class.lpfnWndProc = NullWndProc;
-		RegisterClass(&Class);
+		if (!RegisterClass(&Class))
+		{
+			DWORD dwErr = GetLastError();
+			DebugBreak();
+		}
 
 		hWnd = CreateWindow(szAppName, szAppName, 0, CW_USEDEFAULT, CW_USEDEFAULT,
 			0, 0, NULL, NULL, hInstance, NULL);
