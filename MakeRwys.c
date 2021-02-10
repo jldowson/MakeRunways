@@ -1264,7 +1264,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.11 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.111 by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1607,7 +1607,7 @@ MAINLOOPS:
 							!p->pGateList && !p->pTaxiwayList &&
 						p->r.chRwy[3]) // This last eliminates 998 and 999 maker entries
 				{	if (p->r.chICAO[3] == ' ') p->r.chICAO[3] = 0;
-					fprintf(pf,"%.4s,%.4s,%.6f,%.6f,%d,%d,%d,%.6s\x0d\x0a",
+					fprintf(pf,"%.4s,%.4s,%.8f,%.8f,%d,%d,%d,%.6s\x0d\x0a",
 								p->r.chICAO, p->r.chRwy,
 								(double) p->r.fLat, (double) p->r.fLong,
 								(int) (p->r.fAlt + 0.5), p->r.uHdg,
@@ -1670,7 +1670,7 @@ MAINLOOPS:
 								StringXML(chWk, p->pPathName ? p->pPathName : ""));
 							fprintf(pfi, "<SceneryName>%s</SceneryName>\x0d\x0a",
 								StringXML(chWk, p->pSceneryName ? p->pSceneryName : "" ));
-							fprintf(pfi, "<Longitude>%.6f</Longitude>\x0d\x0a<Latitude>%.6f</Latitude>\x0d\x0a",
+							fprintf(pfi, "<Longitude>%.8f</Longitude>\x0d\x0a<Latitude>%.8f</Latitude>\x0d\x0a",
 									(double) p->r.fLong, (double) p->r.fLat);
 							fprintf(pfi, "<Altitude>%.2f</Altitude>\x0d\x0a<MagVar>%.3f</MagVar>\x0d\x0a",
 									(p->r.fAlt +0.005), (double) p->fMagvar);
@@ -1681,7 +1681,7 @@ MAINLOOPS:
 					{	if (!p->pGateList && !p->pTaxiwayList && p->r.chRwy[3] &&
 								((p->r.chRwy[3] < '4') || fIncludeWater) &&
 								((p->r.chRwy[3] >= '4') || (fIncludeWater >= 0)))
-						{	if (pf) fprintf(pf,"%.4s,%.4s,%.6f,%.6f,%d,%.3f,%d,%.6s,%d,%.3f,%.6f,%.6f,%d\x0d\x0a",
+						{	if (pf) fprintf(pf,"%.4s,%.4s,%.8f,%.8f,%d,%.3f,%d,%.6s,%d,%.3f,%.8f,%.8f,%d\x0d\x0a",
 									p->r.chICAO, p->r.chRwy,
 									(double) p->r.fLat, (double) p->r.fLong,
 									(int) (p->r.fAlt + 0.5), (double) p->fHdg,
@@ -1690,7 +1690,7 @@ MAINLOOPS:
 									(double) p->fLat, (double) p->fLong,
 									p->nOffThresh);
 
-							if (pf2) fprintf(pf2,"%.4s,%.4s,%.6f,%.6f,%d,%.3f,%d,%.6s%s,%d,%.3f,%.6f,%.6f,%d%s%s\x0d\x0a",
+							if (pf2) fprintf(pf2,"%.4s,%.4s,%.8f,%.8f,%d,%.3f,%d,%.6s%s,%d,%.3f,%.8f,%.8f,%d%s%s\x0d\x0a",
 									p->r.chICAO, p->r.chRwy,
 									(double) p->r.fLat, (double) p->r.fLong,
 									(int) (p->r.fAlt + 0.5), (double) p->fHdg,
@@ -2023,7 +2023,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.11");
+			SetWindowText(hDlg, "Make Runways: Version 5.111");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
