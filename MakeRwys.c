@@ -937,7 +937,7 @@ void ScanSceneryArea(char *pszPath)
 			fpos += 8;
 	}
 
-	strcat(szParam, "\\*.bgl");
+	strcat_s(szParam, MAX_PATH, "\\*.bgl");
 	fpos++;
 	hFind = FindFirstFile(szParam, (WIN32_FIND_DATA *) &find);
 	while (hFind != INVALID_HANDLE_VALUE)
@@ -949,9 +949,21 @@ void ScanSceneryArea(char *pszPath)
 		if (pch && (_strnicmp(pch, ".BGL", 5) == 0)) // Eliminate files like "bgl_passive"
 		{	char szFile1[MAX_PATH], szFile2[MAX_PATH], szFile3[MAX_PATH];
 			szFile2[0] = szFile3[0] = 0;
-			strcpy(&szParam[fpos], find.cFileName);
+			if ((fpos + strlen(find.cFileName)) >= MAX_PATH)
+			{	// File path too long!
+				char ch = szParam[fpos];
+				fprintf(fpAFDS, "***** File path too long, greater than MAX_PATH:\n");
+				szParam[fpos] = 0;
+				fprintf(fpAFDS, "%s%s\n", szParam, find.cFileName);
+				goto NEXT_FILE;
+			}
+
+			strcpy_s(&szParam[fpos], MAX_PATH - fpos, find.cFileName);
 			if (!fDeletionsPass)
 				++ulTotalBGLs;
+
+			int len = strlen(szParam);
+			if (len > maxpathlen) maxpathlen = len;
 
 			strcpy(szFile1, szParam);
 			if (fMSFS)
@@ -1018,6 +1030,7 @@ void ScanSceneryArea(char *pszPath)
 			}
 		}
 	
+NEXT_FILE:
 		if (!FindNextFile(hFind, (WIN32_FIND_DATA *) &find))
 		{	FindClose(hFind);
 			hFind = INVALID_HANDLE_VALUE;
@@ -1051,10 +1064,9 @@ void ProcessMSFSCommunity(char* pPath)
 	
 	if (strstr(szPath, "BGL") == NULL)
 	{	// File path too long!
+		fprintf(fpAFDS, "***** File path too long, greater than MAX_PATH:\n");
 		fprintf(fpAFDS, "File path too long, greater than MAX_PATH:\n");
-		fprintf(fpAFDS, szPath);
-		fprintf(fpAFDS, "\n");
-
+		fprintf(fpAFDS, "%s\n", szPath);
 		return;
 	}
 
@@ -1105,10 +1117,9 @@ void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 
 	if (strstr(szPath, "BGL") == NULL)
 	{	// File path too long!
+		fprintf(fpAFDS, "***** File path too long, greater than MAX_PATH:\n");
 		fprintf(fpAFDS, "File path too long, greater than MAX_PATH:\n");
-		fprintf(fpAFDS, szPath);
-		fprintf(fpAFDS, "\n");
-
+		fprintf(fpAFDS, "%s\n", szPath);
 		return;
 	}
 
