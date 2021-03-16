@@ -17,6 +17,7 @@ __int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 P
 
 __int32 errnum = 0;
 __int32 nMatchMyAirline = 0;
+int maxpathlen = 0;
 char chMyAirLine[5];
 char chMyGates[32];
 BOOL fProcessTA = FALSE;
@@ -843,6 +844,12 @@ char *StringXML(char *pszTo, char *pszFrom)
 			pszNow += 4;
 		}
 
+		else if ((*pszFrom == 0xA1) && (*(pszFrom + 1) == 0xF6))
+		{	strcpy(pszNow, "#");
+			pszNow++;
+			pszFrom++;
+		}
+
 		else 
 		{	*pszNow = *pszFrom;
 			pszNow++;
@@ -1017,7 +1024,6 @@ void ScanSceneryArea(char *pszPath)
 		}
 	}
 }
-
 /******************************************************************************
 		 Data for scenery layer list
 ******************************************************************************/
@@ -1035,13 +1041,25 @@ __int32 nAsobo = 0;
 		 ProcessMSFSCommunity
 ******************************************************************************/
 
-ProcessMSFSCommunity(char* pPath)
+void ProcessMSFSCommunity(char* pPath)
 {	char szPath[MAX_PATH];
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
 
-	strcpy(szPath, pPath);
-	strcat(szPath, "*.BGL");
+	strcpy_s(szPath, MAX_PATH, pPath);
+	strcat_s(szPath, MAX_PATH, "*.BGL");
+	
+	if (strstr(szPath, "BGL") == NULL)
+	{	// File path too long!
+		fprintf(fpAFDS, "File path too long, greater than MAX_PATH:\n");
+		fprintf(fpAFDS, szPath);
+		fprintf(fpAFDS, "\n");
+
+		return;
+	}
+
+	int len = strlen(szPath);
+	if (len > maxpathlen) maxpathlen = len;
 
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
@@ -1052,17 +1070,17 @@ ProcessMSFSCommunity(char* pPath)
 	FindClose(hFind);
 	hFind = INVALID_HANDLE_VALUE;
 
-	strcpy(szPath, pPath);
-	strcat(szPath, "*.*");
+	strcpy_s(szPath, MAX_PATH, pPath);
+	strcat_s(szPath, MAX_PATH, "*.*");
 
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
 	while (hFind != INVALID_HANDLE_VALUE)
 	{	// Check for directory
 		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
 			strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, ".."))
-		{	strcpy(szPath, pPath);
-			strcat(szPath, fd.cFileName);
-			strcat(szPath, "\\");
+		{	strcpy_s(szPath, MAX_PATH, pPath);
+			strcat_s(szPath, MAX_PATH, fd.cFileName);
+			strcat_s(szPath, MAX_PATH, "\\");
 			ProcessMSFSCommunity(szPath);
 		}
 
@@ -1077,13 +1095,25 @@ ProcessMSFSCommunity(char* pPath)
 		 ProcessMSFSOfficial
 ******************************************************************************/
 
-ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
+void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 {	char szPath[MAX_PATH];
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
 	
-	strcpy(szPath, pPath);
-	strcat(szPath, "*.BGL");
+	strcpy_s(szPath, MAX_PATH, pPath);
+	strcat_s(szPath, MAX_PATH, "*.BGL");
+
+	if (strstr(szPath, "BGL") == NULL)
+	{	// File path too long!
+		fprintf(fpAFDS, "File path too long, greater than MAX_PATH:\n");
+		fprintf(fpAFDS, szPath);
+		fprintf(fpAFDS, "\n");
+
+		return;
+	}
+
+	int len = strlen(szPath);
+	if (len > maxpathlen) maxpathlen = len;
 
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
@@ -1097,8 +1127,8 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 	FindClose(hFind);
 	hFind = INVALID_HANDLE_VALUE;
 	
-	strcpy(szPath, pPath);
-	strcat(szPath, "*.*");
+	strcpy_s(szPath, MAX_PATH, pPath);
+	strcat_s(szPath, MAX_PATH, "*.*");
 
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
 	while (hFind != INVALID_HANDLE_VALUE)
@@ -1106,9 +1136,9 @@ ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
 				strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
 				(_strnicmp(fd.cFileName, "asobo", 5) || (_strnicmp(fd.cFileName, "asobo-airport", 13) == 0)))
-		{	strcpy(szPath, pPath);
-			strcat(szPath, fd.cFileName);
-			strcat(szPath, "\\");
+		{	strcpy_s(szPath, MAX_PATH, pPath);
+			strcat_s(szPath, MAX_PATH, fd.cFileName);
+			strcat_s(szPath, MAX_PATH, "\\");
 			ProcessMSFSOfficial(szPath, strstr(szPath, "asobo-airport") != 0);
 		}
 	
@@ -1264,7 +1294,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.11 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.122 by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1630,10 +1660,10 @@ MAINLOOPS:
 		pft = fopen("t5.csv", "wb");
 		pftbin = fopen("t5.bin", "wb");
 		pfi = fopen("runways.xml", "wb");
-		if (!pfi)
-		{	DWORD err = GetLastError();
-			DebugBreak();
-		}
+		//if (!pfi)
+		//{	DWORD err = GetLastError();
+		//	DebugBreak();
+		//}
 
 		if (pf || pf2 || pfi)
 			{	static char *pszILSflags[] = {	"", "B", "G", "BG", "D", "BD", "DG", "BDG" };
@@ -1996,6 +2026,9 @@ MAINLOOPS:
 	MakeHelipadsFile();
 	MakeCommsFile();
 	if (fProcessTA)	UpdateTransitionAlts();
+
+	fprintf(fpAFDS, "\nMax filepath length used for BGL search: %d\n", maxpathlen);
+
 	fclose(fpAFDS);
 
 	if (pLocPak) free(pLocPak);
@@ -2023,7 +2056,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.11");
+			SetWindowText(hDlg, "Make Runways: Version 5.122");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 

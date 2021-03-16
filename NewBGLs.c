@@ -1954,9 +1954,15 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 			else
 			{
 				__int32 wp1x = (-wp1) - 1;
-				SetLocPos(&locg, 0,
-					(*(ppg4[wp1x])).nLat, (*(ppg4[wp1x])).nLon,
-					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				if (ppg4[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg4[wp1x])).nLat, (*(ppg4[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				
+				// else fprintf(fpAFDS, "### ERROR in TaxiWay: (wp1x) %d\n", wp1x);
+
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
 			}
@@ -1990,9 +1996,15 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 				else
 				{
 					__int32 wp2x = (-wp2) - 1;
-					SetLocPos(&locg, 0,
-						(*(ppg4[wp2x])).nLat, (*(ppg4[wp2x])).nLon,
-						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					if (ppg4[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg4[wp2x])).nLat, (*(ppg4[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+
+					//else fprintf(fpAFDS, "### ERROR in TaxiWay: (wp2x) %d\n", wp2x);
+
 					tw[wPts].bOrientation = 0;
 					tw[wPts].bType = 5;
 				}
@@ -2679,7 +2691,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 							(pa->wId == OBJTYPE_NEWRUNWAY) ? "New" : "", pa->nLen, sizeof(NRWY));
 
 					if (pa->wId == OBJTYPE_RUNWAY)
-					{	FindOffThresh(&rwy1, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 6);
+					{	FindOffThresh(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 6);
 						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 13);
 						FindVASI(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 14);
 						FindAppLights(&rwy2, (NAPT *) ((BYTE *) pa + sizeof(NRWY)), nThisLen - sizeof(NRWY), 16);
@@ -3175,12 +3187,27 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 						MakeTaxiwayList2(pNTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
 			}
 			else if (pTpnt)
-			{	rwy1.pTaxiwayList = 
+			{
+				rwy1.pTaxiwayList =
 					fNewTaxiPath ?
 					(fNewTaxiPath == -1) ?
-						NewMakeTaxiwayList3(pTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
-						NewMakeTaxiwayList(pTpnt, pTname, pNTpath, wTpnt, wTname, wTpath) :
-						MakeTaxiwayList(pTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
+					NewMakeTaxiwayList3(pTpnt, pTname, pNTpath3, wTpnt, wTname, wTpath) :
+					NewMakeTaxiwayList(pTpnt, pTname, pNTpath, wTpnt, wTname, wTpath) :
+					MakeTaxiwayList(pTpnt, pTname, pTpath, wTpnt, wTname, wTpath);
+
+				/*TEMP ###########################################
+				if ((strncmp("KATL", chICAO, 4) == 0) && rwy1.pTaxiwayList)
+				{
+					TWHDR *px = rwy1.pTaxiwayList;
+					int ix = 0;
+					while (px)
+					{
+						fprintf(fpAFDS, "TaxiName %d = %s\n", ix++, px->chName);
+						px = (int)px + (px->wPoints * sizeof(TW)) + sizeof(TWHDR);
+						if (px->wPoints == 0) break;
+					}
+				}
+				// ################################################*/
 			}
 
 			if (rwy1.pTaxiwayList)
