@@ -844,11 +844,13 @@ char *StringXML(char *pszTo, char *pszFrom)
 			pszNow += 4;
 		}
 
+		/*************************
 		else if ((*pszFrom == 0xA1) && (*(pszFrom + 1) == 0xF6))
 		{	strcpy(pszNow, "#");
 			pszNow++;
 			pszFrom++;
 		}
+		//************************/
 
 		else 
 		{	*pszNow = *pszFrom;
@@ -1050,6 +1052,9 @@ __int32 nArea = 0;
 char szAsoboPaths[1000][MAX_PATH];
 __int32 nAsobo = 0;
 
+char szOtherPaths[1000][MAX_PATH];
+__int32 nOther = 0;
+
 /******************************************************************************
 		 ProcessMSFSCommunity
 ******************************************************************************/
@@ -1129,9 +1134,11 @@ void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*) &fd);
 	if ((hFind != INVALID_HANDLE_VALUE) && !(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 	{	// found a scenery layer - add it to the list ...
-		if (fAsobo)
+		if (fAsobo > 0)
 			strcpy(szAsoboPaths[nAsobo++], pPath);
-		else 
+		if (fAsobo < 0)
+			strcpy(szOtherPaths[nOther++], pPath);
+		if (fAsobo == 0) 
 			strcpy(szPaths[nArea++], pPath);
 	}
 
@@ -1150,7 +1157,19 @@ void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 		{	strcpy_s(szPath, MAX_PATH, pPath);
 			strcat_s(szPath, MAX_PATH, fd.cFileName);
 			strcat_s(szPath, MAX_PATH, "\\");
-			ProcessMSFSOfficial(szPath, strstr(szPath, "asobo-airport") != 0);
+
+#ifdef _DEBUG
+			OutputDebugString(szPath);
+			OutputDebugString(
+				strstr(szPath, "asobo-") != 0 ? "===asobo\n" :
+				strstr(szPath, "microsoft-") != 0 ? "===asobo\n" :
+				strstr(szPath, "fs-base") != 0 ? "===Base\n" : "===Other\n");
+#endif
+			
+			ProcessMSFSOfficial(szPath,
+				strstr(szPath, "asobo-") != 0 ? 1 :
+				strstr(szPath, "microsoft-") != 0 ? 1 :
+				strstr(szPath, "fs-base") != 0 ? 0 : -1);
 		}
 	
 		if (!FindNextFile(hFind, (WIN32_FIND_DATA*) &fd))
@@ -1305,7 +1324,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.122 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.124 by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1494,10 +1513,16 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			}
 
 			ProcessMSFSOfficial(szCfgPath, FALSE);
-			// Add the asobo-airport entries to the end of the main list
+			// Add the asobo-airport entries to the end of the main list so far
 			__int32 i = 0;
 			while (i < nAsobo)
 				strcpy(szPaths[nArea++], szAsoboPaths[i++]);
+
+			// Add the any other entries to the end of the main list
+			i = 0;
+			while (i < nOther)
+				strcpy(szPaths[nArea++], szOtherPaths[i++]);
+
 		}
 		
 		strcpy(&szCfgPath[fsPathLen], "\\Community\\");
@@ -2067,7 +2092,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.122");
+			SetWindowText(hDlg, "Make Runways: Version 5.124");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
