@@ -1324,7 +1324,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.124 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.125 by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1404,6 +1404,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		// Get content list (for disable options)
 		strcpy(szCopyPath, szCfgPath);
 		strcpy(&szCopyPath[n], "\\content.xml");
+
+		fprintf(fpAFDS, "Looking for:\n   \x22%s\x22\n", szCopyPath);
 		
 		HANDLE h = CreateFile(szCopyPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
@@ -1413,8 +1415,17 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			ReadFile((HANDLE) h, pContent, len, &l, NULL);
 			pContent[len] = 0;
 			CloseHandle((HANDLE) h);
+			fprintf(fpAFDS, "    ---- okay, Content list loaded\n");
 		}
-		
+
+		else
+		{
+			DWORD dw = GetLastError();
+			fprintf(fpAFDS, "    ---- not found, error %d\n", dw);
+		}
+
+		fprintf(fpAFDS, "Now looking for:\n    \x22%s\x22\n", szCfgPath);
+
 		h = CreateFile(szCfgPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h)
 		{	fOk = FALSE;
@@ -1445,6 +1456,12 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 			CloseHandle(h);
 		}
+
+		else
+		{
+			DWORD dw = GetLastError();
+			fprintf(fpAFDS, "    ---- not found, error %d\n", dw);
+		}
 		
 		if (!fOk)
 		{	//Make assumption if "proper" method fails:
@@ -1454,14 +1471,17 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 		__int32 fsPathLen = strlen(szCfgPath);
 		strcpy(&szCfgPath[fsPathLen], "\\Official\\OneStore\\");
-		
+
+		fprintf(fpAFDS, "Checking:\n    \x22%s\x22\n", szCfgPath);
+
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// Not MS Store, try Steam version:
 			strcpy(&szCfgPath[fsPathLen], "\\Official\\Steam\\");
+			fprintf(fpAFDS, "    ---- not found, trying:\n    \x22%s\x22\n", szCfgPath);
 		}
 		
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
-		{	fprintf(fpAFDS, "Found MSFS official scenery in: \n  \x22%s\x22\n", szCfgPath);
+		{	fprintf(fpAFDS, "Found MSFS official scenery in:\n    \x22%s\x22\n", szCfgPath);
 
 			// Load the language file for airport name look-up
 			char szLangPath[MAX_PATH];
@@ -1471,6 +1491,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			{	HANDLE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 				if (h)
 				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
+					fprintf(fpAFDS, "Loading language pack from:\n    \x22%s\x22\n", szLangPath);
 					pLocPak = malloc((int) len + 1);
 					if (pLocPak)
 					{	__int32 l;
@@ -1494,6 +1515,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				HANDLE h = CreateFile(szMatsPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 				if (h)
 				{
+					fprintf(fpAFDS, "Loading materials list from:\n    \x22%s\x22\n", szMatsPath);
 					DWORD lenHi, len = GetFileSize((HANDLE)h, &lenHi);
 					__int32 l;
 					pMaterials = malloc((int) len + 1);
@@ -1524,11 +1546,21 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				strcpy(szPaths[nArea++], szOtherPaths[i++]);
 
 		}
+
+		else
+		{
+			fprintf(fpAFDS, "    ---- Cannot find the MSFS Official scenery!\n");
+		}
 		
 		strcpy(&szCfgPath[fsPathLen], "\\Community\\");
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS community scenery in: \n  \x22%s\x22\n", szCfgPath);
 			ProcessMSFSCommunity(szCfgPath);
+		}
+
+		else
+		{
+			fprintf(fpAFDS, "    ---- Cannot find any Community scenery!\n");
 		}
 
 		// complete the tables (with fiction at present)
@@ -2092,7 +2124,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.124");
+			SetWindowText(hDlg, "Make Runways: Version 5.125");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 

@@ -65,8 +65,8 @@ LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_UK
 //
 
 1 VERSIONINFO
- FILEVERSION 5,1,2,4
- PRODUCTVERSION 5,1,2,4
+ FILEVERSION 5,1,2,5
+ PRODUCTVERSION 5,1,2,5
  FILEFLAGSMASK 0x17L
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -81,15 +81,15 @@ BEGIN
     BEGIN
         BLOCK "080904b0"
         BEGIN
-            VALUE "Comments", "Version 5.124 made on 17th March 2021 by Pete Dowson"
+            VALUE "Comments", "Version 5.125 made on 25th March 2021 by Pete Dowson"
             VALUE "CompanyName", "Peter L. Dowson"
             VALUE "FileDescription", "Makes scenery data files for assorted utilities"
-            VALUE "FileVersion", "5, 1, 2, 4"
+            VALUE "FileVersion", "5, 1, 2, 5"
             VALUE "InternalName", "MakeRwys"
             VALUE "LegalCopyright", "Copyright (C) Peter L. Dowson,  2021"
             VALUE "OriginalFilename", "MakeRwys.exe"
             VALUE "ProductName", "Make Runways Files"
-            VALUE "ProductVersion", "5, 1, 2, 4"
+            VALUE "ProductVersion", "5, 1, 2, 5"
         END
     END
     BLOCK "VarFileInfo"
