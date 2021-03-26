@@ -1312,7 +1312,7 @@ char *pNextPathName = chPathNames;
 DWORD WINAPI MainRoutine (PVOID pvoid)
 {	char szArea[512], szParam[64];
 	char szCfgPath[MAX_PATH + 128];
-	BOOL fOk = 0, fFSX = -1;
+	BOOL fOk = 0, fFSX = -1, fFoundOk = TRUE;;
 	
 	memset(&nAreas[0], 0xff, sizeof(nAreas));
 	memset(&bActive[0], 0, sizeof(bActive));
@@ -1320,11 +1320,12 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	ulTotalAPs = ulTotalRwys = 0;
 	fpAFDS = fopen("Runways.txt","w");
 	if (!fpAFDS)
-	{	if (!fQuiet) MessageBox(NULL, "Error: cannot write Runways.txt file!", "MakeRunways Error", MB_ICONSTOP);
+	{	if (!fQuiet) MessageBox(NULL, "Error: cannot write Runways.txt file!\nIs it open in an editor?", "MakeRunways Error", MB_ICONSTOP);
+		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.125 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.126 by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1550,6 +1551,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		else
 		{
 			fprintf(fpAFDS, "    ---- Cannot find the MSFS Official scenery!\n");
+			fFoundOk = FALSE;
 		}
 		
 		strcpy(&szCfgPath[fsPathLen], "\\Community\\");
@@ -1568,8 +1570,18 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 		fMSFS = TRUE;
 		nVersion = 7;
-		fprintf(fpAFDS, "Reading MSFS scenery:\n");
-		goto MAINLOOPS;
+		if (fFoundOk)
+		{	fprintf(fpAFDS, "Reading MSFS scenery:\n");
+			goto MAINLOOPS;
+		}
+
+		else
+		{	fprintf(fpAFDS, "\n\nCannot find MSFS base scenery! Giving up!\n\n");
+			fprintf(fpAFDS, chLine);
+			PostMessage(hWnd, WM_USER, 3, fOk);
+			if (fQuiet) SendMessage(hWnd, WM_CLOSE, 0, 0);
+			return 0;
+		}
 	}
 
 	fprintf(fpAFDS, "Reading %s scenery:\n", pszSimName[fFSX+1]);	
@@ -2124,7 +2136,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.125");
+			SetWindowText(hDlg, "Make Runways: Version 5.126");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2155,6 +2167,11 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 					if (ulTotalBytes)
 						sprintf(&wk[x], ", Bytes scanned = %d", ulTotalBytes);
 					SetWindowText(GetDlgItem(hWnd, IDC_TOTALS2), wk);
+					break;
+
+				case 3:
+					SetWindowText(GetDlgItem(hWnd, IDC_AREA),
+						"Not able to continue! No scenery located (see RUNWAYS.TXT)");
 					break;
 					
 				default:
