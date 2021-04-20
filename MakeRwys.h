@@ -3,6 +3,7 @@
 
 //#define HEX 1
 #define PI 3.14159265358979
+#define MY_MAX_PATH 520
 
 #define _CRT_SECURE_NO_DEPRECATE
 #define WIN32_LEAN_AND_MEAN

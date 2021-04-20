@@ -81,8 +81,8 @@ char *chOddRwys[16] =
 };
 
 char chLine[] = "=============================================================================\n";
-char szMyPath[MAX_PATH + 32];
-char szCurrentFilePath[MAX_PATH];
+char szMyPath[MY_MAX_PATH];
+char szCurrentFilePath[MY_MAX_PATH];
 BGLHDR bglhdr;
 NBGLHDR nbglhdr;
 
@@ -649,7 +649,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 			"\\Lockheed Martin\\Prepar3D v5\\SCENERY.CFG",
 	};
 
-	char szPathName[MAX_PATH], szPathAppend[MAX_PATH];
+	char szPathName[MY_MAX_PATH], szPathAppend[MY_MAX_PATH];
 	char *pchUser, *pchUser2;
 	HANDLE hDir;
 	HANDLE hFile;
@@ -662,7 +662,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 	
 	if (nVers >= 4)
 	{	// For Prepar3D v3 - v5, see if AddonOrganizer is available
-		char szAddonsPath[(MAX_PATH * 2) + 16], szMyPath2[MAX_PATH], *pch;
+		char szAddonsPath[MY_MAX_PATH + 16], szMyPath2[MY_MAX_PATH], *pch;
 		__int32 len, len2 = MAX_PATH + 64;
 
 		szAddonsPath[0] = 0;
@@ -1311,7 +1311,7 @@ char *pNextPathName = chPathNames;
 
 DWORD WINAPI MainRoutine (PVOID pvoid)
 {	char szArea[512], szParam[64];
-	char szCfgPath[MAX_PATH + 128];
+	char szCfgPath[MY_MAX_PATH];
 	BOOL fOk = 0, fFSX = -1, fFoundOk = TRUE;;
 	
 	memset(&nAreas[0], 0xff, sizeof(nAreas));
@@ -1325,7 +1325,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.126 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.126a by Pete Dowson\n");	
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1386,18 +1386,18 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 	else if ((fFSX < 0) && fDoMSFS)
 	{	// See if it is MSFS, in MS Store location
-		char szCopyPath[MAX_PATH];
+		char szCopyPath[MY_MAX_PATH];
 
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
-		strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache");
+		strcat_s(szCfgPath, MY_MAX_PATH, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache");
 		__int32 n = strlen(szCfgPath);
 
 		strcpy(&szCfgPath[n], "\\UserCfg.opt");
-		
+
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// try Steam
 			strcpy(szCfgPath, getenv("APPDATA"));
-			strcat(szCfgPath, "\\Microsoft Flight Simulator");
+			strcat_s(szCfgPath, MY_MAX_PATH, "\\Microsoft Flight Simulator");
 			n = strlen(szCfgPath);
 			strcpy(&szCfgPath[n], "\\UserCfg.opt");
 		}
@@ -1467,7 +1467,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		if (!fOk)
 		{	//Make assumption if "proper" method fails:
 			strcpy(szCfgPath, getenv("LOCALAPPDATA"));
-			strcat(szCfgPath, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
+			strcat_s(szCfgPath, MY_MAX_PATH, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
 		}
 
 		__int32 fsPathLen = strlen(szCfgPath);
@@ -1485,9 +1485,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		{	fprintf(fpAFDS, "Found MSFS official scenery in:\n    \x22%s\x22\n", szCfgPath);
 
 			// Load the language file for airport name look-up
-			char szLangPath[MAX_PATH];
+			char szLangPath[MY_MAX_PATH];
 			strcpy(szLangPath, szCfgPath);
-			strcat(szLangPath, "fs-base\\en-US.locPak");
+			strcat_s(szLangPath, MY_MAX_PATH, "fs-base\\en-US.locPak");
 			if (GetFileAttributes(szLangPath) != INVALID_FILE_ATTRIBUTES)
 			{	HANDLE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 				if (h)
@@ -1508,9 +1508,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			}
 
 			// Load the materials file for runway surface look-up
-			char szMatsPath[MAX_PATH];
+			char szMatsPath[MY_MAX_PATH];
 			strcpy(szMatsPath, szCfgPath);
-			strcat(szMatsPath, "fs-base-material-lib\\MaterialLibs\\Base_MaterialLib\\Library.xml");
+			strcat_s(szMatsPath, MY_MAX_PATH, "fs-base-material-lib\\MaterialLibs\\Base_MaterialLib\\Library.xml");
 			if (GetFileAttributes(szMatsPath) != INVALID_FILE_ATTRIBUTES)
 			{
 				HANDLE h = CreateFile(szMatsPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -2136,7 +2136,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.126");
+			SetWindowText(hDlg, "Make Runways: Version 5.126a");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
