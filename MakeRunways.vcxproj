@@ -132,6 +132,7 @@
     </Link>
     <ClCompile>
       <StructMemberAlignment>Default</StructMemberAlignment>
+      <AssemblerOutput>AssemblyAndSourceCode</AssemblerOutput>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

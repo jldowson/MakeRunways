@@ -32,6 +32,9 @@ char *pszSimName[9] = {
 char *pPathName = 0;
 char *pSceneryName = 0;
 HINSTANCE hInstance;
+char szFSpath[MAX_PATH] = ""; // Used for shorter pathnames in MSFS
+char szMYpath[MAX_PATH] = ""; // Used to return to loading path
+char szOfficial[MAX_PATH] = "";
 
 /******************************************************************************
          Data
@@ -82,6 +85,7 @@ char *chOddRwys[16] =
 
 char chLine[] = "=============================================================================\n";
 char szMyPath[MY_MAX_PATH];
+int nMyPathLen = 0;
 char szCurrentFilePath[MY_MAX_PATH];
 BGLHDR bglhdr;
 NBGLHDR nbglhdr;
@@ -807,7 +811,8 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 ******************************************************************************/
 
 void StartXML(FILE *pfi)
-{	fprintf(pfi,"<?xml version=\"1.0\"?>\x0d\x0a");
+{	fprintf(pfi,"<?xml version=\"1.0\" encoding=\"Windows-1252\" ?>\x0d\x0a");
+	//fprintf(pfi,"<?xml version=\"1.0\"?>\x0d\x0a");
 	fprintf(pfi,"<data>\x0d\x0a");	
 	fprintf(pfi, "<SimVersion>%s</SimVersion>\x0d\x0a", pszSimName[nVersion + 1]);
 }
@@ -989,7 +994,8 @@ void ScanSceneryArea(char *pszPath)
 			SetWindowText(GetDlgItem(hWnd, IDC_FILE2), szFile2);
 			SetWindowText(GetDlgItem(hWnd, IDC_FILE3), szFile3);
 			PostMessage(hWnd, WM_USER, 1, 0);
-								
+						
+			if (szFSpath[0]) _chdir(szFSpath);
 			fpIn = fopen(szParam, "rb");
 
 			strcpy(pNextPathName, szParam);
@@ -1044,15 +1050,15 @@ NEXT_FILE:
 ******************************************************************************/
 
 __int32 nAreas[10000]; // Priorities 1-9999
-char szTitles[10000][64];
+char szTitles[10000][MAX_PATH];
 char szPaths[10000][MAX_PATH];
 BYTE bActive[10000];
 __int32 nArea = 0;
 
-char szAsoboPaths[1000][MAX_PATH];
+char szAsoboPaths[1000][MY_MAX_PATH];
 __int32 nAsobo = 0;
 
-char szOtherPaths[1000][MAX_PATH];
+char szOtherPaths[1000][MY_MAX_PATH];
 __int32 nOther = 0;
 
 /******************************************************************************
@@ -1060,12 +1066,15 @@ __int32 nOther = 0;
 ******************************************************************************/
 
 void ProcessMSFSCommunity(char* pPath)
-{	char szPath[MAX_PATH];
+{	char szPath[MY_MAX_PATH];
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
 
-	strcpy_s(szPath, MAX_PATH, pPath);
-	strcat_s(szPath, MAX_PATH, "*.BGL");
+	fprintf(fpAFDS, "***** Processing MSFS community scenery \n\t\x22%s\x22\n", pPath);
+	fflush(fpAFDS);
+
+	strcpy_s(szPath, MY_MAX_PATH, pPath);
+	strcat_s(szPath, MY_MAX_PATH, "*.BGL");
 	
 	if (strstr(szPath, "BGL") == NULL)
 	{	// File path too long!
@@ -1087,17 +1096,17 @@ void ProcessMSFSCommunity(char* pPath)
 	FindClose(hFind);
 	hFind = INVALID_HANDLE_VALUE;
 
-	strcpy_s(szPath, MAX_PATH, pPath);
-	strcat_s(szPath, MAX_PATH, "*.*");
+	strcpy_s(szPath, MY_MAX_PATH, pPath);
+	strcat_s(szPath, MY_MAX_PATH, "*.*");
 
 	hFind = FindFirstFile(szPath, (WIN32_FIND_DATA*)&fd);
 	while (hFind != INVALID_HANDLE_VALUE)
 	{	// Check for directory
 		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
 			strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, ".."))
-		{	strcpy_s(szPath, MAX_PATH, pPath);
-			strcat_s(szPath, MAX_PATH, fd.cFileName);
-			strcat_s(szPath, MAX_PATH, "\\");
+		{	strcpy_s(szPath, MY_MAX_PATH, pPath);
+			strcat_s(szPath, MY_MAX_PATH, fd.cFileName);
+			strcat_s(szPath, MY_MAX_PATH, "\\");
 			ProcessMSFSCommunity(szPath);
 		}
 
@@ -1113,18 +1122,22 @@ void ProcessMSFSCommunity(char* pPath)
 ******************************************************************************/
 
 void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
-{	char szPath[MAX_PATH];
+{	char szPath[MY_MAX_PATH];
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
-	
-	strcpy_s(szPath, MAX_PATH, pPath);
-	strcat_s(szPath, MAX_PATH, "*.BGL");
+
+	fprintf(fpAFDS, "***** Processing MSFS official scenery (Asobo=%d)\n\t\x22%s\x22\n", fAsobo, pPath);
+	fflush(fpAFDS);
+
+	strcpy_s(szPath, MY_MAX_PATH, pPath);
+	strcat_s(szPath, MY_MAX_PATH, "*.BGL");
 
 	if (strstr(szPath, "BGL") == NULL)
 	{	// File path too long!
 		fprintf(fpAFDS, "***** File path too long, greater than MAX_PATH:\n");
 		fprintf(fpAFDS, "File path too long, greater than MAX_PATH:\n");
 		fprintf(fpAFDS, "%s\n", szPath);
+		fflush(fpAFDS);
 		return;
 	}
 
@@ -1154,9 +1167,9 @@ void ProcessMSFSOfficial(char* pPath, BOOL fAsobo)
 		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
 				strcmp(fd.cFileName, ".") && strcmp(fd.cFileName, "..") &&
 				(_strnicmp(fd.cFileName, "asobo", 5) || (_strnicmp(fd.cFileName, "asobo-airport", 13) == 0)))
-		{	strcpy_s(szPath, MAX_PATH, pPath);
-			strcat_s(szPath, MAX_PATH, fd.cFileName);
-			strcat_s(szPath, MAX_PATH, "\\");
+		{	strcpy_s(szPath, MY_MAX_PATH, pPath);
+			strcat_s(szPath, MY_MAX_PATH, fd.cFileName);
+			strcat_s(szPath, MY_MAX_PATH, "\\");
 
 #ifdef _DEBUG
 			OutputDebugString(szPath);
@@ -1192,43 +1205,11 @@ void CompleteTables(void)
 		nAreas[i] = i + 1;
 		bActive[i] = 0xff;
 		__int32 j = strlen(szPaths[i]);
-		BOOL fCommunity = FALSE;
 		szPaths[i][--j] = 0; // Dispense with last backslash
-		psz = strstr(szPaths[i], "OneStore");
-		if (psz) psz += 9;
-		else
-		{
-			psz = strstr(szPaths[i], "Steam");
-			if (psz) psz += 6;
-			else
-			{
-				psz = strstr(szPaths[i], "Community");
-				if (psz)
-				{
-					psz += 10;
-					fCommunity = TRUE;
-				}
-			}
-		}
-
-		if (psz)
-		{
-			strcpy(szTitles[i], psz);
-			psz = (strchr(szTitles[i], '\\'));
-			if ((_strnicmp(szTitles[i], "Asobo", 5) == 0) || fCommunity)
-				*psz = 0;
-			else
-			{
-				if (psz && (_strnicmp(++psz, "Scenery", 7) == 0))
-					psz += 7;
-				if (psz && !isdigit(psz[1]) && _strnicmp(&psz[1], "Base", 4) &&
-					_strnicmp(&psz[1], "World", 5))
-					*psz = 0;
-			}
-			while (psz = strchr(szTitles[i], '\\'))
-				*psz = ' ';
-		}
-
+		
+		strcpy(szTitles[i], szPaths[i]);
+		while (psz = strchr(szTitles[i], '\\'))
+			*psz = ' ';
 		i++;
 	}
 
@@ -1279,6 +1260,7 @@ void CompleteTables(void)
 		pContent = 0;
 	}
 
+	if (szMYpath[0]) _chdir(szMYpath);
 	FILE *fpList = fopen("SceneryList.txt", "w");
 	if (fpList)
 	{	int i = 0;
@@ -1290,6 +1272,7 @@ void CompleteTables(void)
 		}
 		fclose(fpList);
 	}
+	if (szFSpath[0]) _chdir(szFSpath);
 }
 
 /******************************************************************************
@@ -1318,14 +1301,16 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	memset(&bActive[0], 0, sizeof(bActive));
 
 	ulTotalAPs = ulTotalRwys = 0;
+	if (szMYpath[0]) _chdir(szMYpath);
 	fpAFDS = fopen("Runways.txt","w");
 	if (!fpAFDS)
 	{	if (!fQuiet) MessageBox(NULL, "Error: cannot write Runways.txt file!\nIs it open in an editor?", "MakeRunways Error", MB_ICONSTOP);
-		SendMessage(hWnd, WM_CLOSE, 0, 0);
-		return 0;
+			SendMessage(hWnd, WM_CLOSE, 0, 0);
+			return 0;
 	}
 
-	fprintf(fpAFDS, "Make Runways File: Version 5.126a by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.128 by Pete Dowson\n");	
+	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
 	strcpy(szCfgPath, szMyPath);
@@ -1369,6 +1354,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		
 		if (fFSX < 0)
 			fFSX = SetSceneryCfgPath(&szCfgPath[0], 0);
+
 	}
 
 	// fprintf(fpAFDS, "\nfFSX = %d, fDoMSFS = %d\n", fFSX, fDoMSFS);
@@ -1376,10 +1362,19 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	if ((fFSX < 0) && fLocal)
 	{	fMSFS = TRUE;
 		nVersion = 7;
-		GetModuleFileName(NULL, szCfgPath, MAX_PATH);
-		char* psz = strrchr(szCfgPath, '\\');
+
+		strncpy(szMYpath, szMyPath, nMyPathLen);
+		szMYpath[nMyPathLen] = 0;
+
+		GetModuleFileName(NULL, szFSpath, MAX_PATH);
+		char* psz = strrchr(szFSpath, '\\');
 		if (psz) psz[1] = 0;
+		strcpy(szCfgPath, "Community");
+
+		fprintf(fpAFDS, "Processing MSFS scenery in \22%s\22\n", szFSpath);
+		_chdir(szFSpath);
 		ProcessMSFSCommunity(szCfgPath);
+
 		CompleteTables();
 		goto MAINLOOPS;
 	}
@@ -1388,23 +1383,38 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	{	// See if it is MSFS, in MS Store location
 		char szCopyPath[MY_MAX_PATH];
 
+		//strcpy(szCfgPath, "\\\\?\\");
+		strncpy(szMYpath, szMyPath, nMyPathLen);
+		szMYpath[nMyPathLen] = 0;
 		strcpy(szCfgPath, getenv("LOCALAPPDATA"));
 		strcat_s(szCfgPath, MY_MAX_PATH, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache");
+		strcpy(szFSpath, szCfgPath);
+		_chdir(szFSpath);
+
+		szCfgPath[0] = 0;
 		__int32 n = strlen(szCfgPath);
 
-		strcpy(&szCfgPath[n], "\\UserCfg.opt");
+		strcpy(&szCfgPath[n], "UserCfg.opt");
 
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// try Steam
 			strcpy(szCfgPath, getenv("APPDATA"));
 			strcat_s(szCfgPath, MY_MAX_PATH, "\\Microsoft Flight Simulator");
+			strcpy(szFSpath, szCfgPath);
+			_chdir(szFSpath);
+
+			szCfgPath[0] = 0;
 			n = strlen(szCfgPath);
-			strcpy(&szCfgPath[n], "\\UserCfg.opt");
+
+
+			strcpy(&szCfgPath[n], "UserCfg.opt");
 		}
-		
+
+		fprintf(fpAFDS, "Processing MSFS scenery in \x22%s\x22\n\n", szFSpath);
+
 		// Get content list (for disable options)
 		strcpy(szCopyPath, szCfgPath);
-		strcpy(&szCopyPath[n], "\\content.xml");
+		strcpy(&szCopyPath[n], "content.xml");
 
 		fprintf(fpAFDS, "Looking for:\n   \x22%s\x22\n", szCopyPath);
 		
@@ -1420,8 +1430,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		}
 
 		else
-		{
-			DWORD dw = GetLastError();
+		{	DWORD dw = GetLastError();
 			fprintf(fpAFDS, "    ---- not found, error %d\n", dw);
 		}
 
@@ -1432,7 +1441,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		{	fOk = FALSE;
 			__int32 lenHi, len = GetFileSize(h, &lenHi);
 			char* pCfg = malloc((int) len + 1);
-			
+
 			if (pCfg)
 			{
 				__int32 l;
@@ -1451,7 +1460,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 						fOk = TRUE;
 					}
 				}
-				
+
 				free(pCfg);
 			}
 
@@ -1468,21 +1477,31 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		{	//Make assumption if "proper" method fails:
 			strcpy(szCfgPath, getenv("LOCALAPPDATA"));
 			strcat_s(szCfgPath, MY_MAX_PATH, "\\Packages\\Microsoft.FlightSimulator_8wekyb3d8bbwe\\LocalCache\\Packages\\");
+			strcpy(szFSpath, szCfgPath);
+			_chdir(szFSpath);
+
+			szCfgPath[0] = 0;
+			n = strlen(szCfgPath);
 		}
 
 		__int32 fsPathLen = strlen(szCfgPath);
 		strcpy(&szCfgPath[fsPathLen], "\\Official\\OneStore\\");
 
 		fprintf(fpAFDS, "Checking:\n    \x22%s\x22\n", szCfgPath);
+		fflush(fpAFDS);
 
 		if (GetFileAttributes(szCfgPath) == INVALID_FILE_ATTRIBUTES)
 		{	// Not MS Store, try Steam version:
 			strcpy(&szCfgPath[fsPathLen], "\\Official\\Steam\\");
 			fprintf(fpAFDS, "    ---- not found, trying:\n    \x22%s\x22\n", szCfgPath);
+			fflush(fpAFDS);
 		}
 		
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS official scenery in:\n    \x22%s\x22\n", szCfgPath);
+			fflush(fpAFDS);
+
+			strcpy(szOfficial, &szCfgPath[fsPathLen + 1]);
 
 			// Load the language file for airport name look-up
 			char szLangPath[MY_MAX_PATH];
@@ -1493,6 +1512,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				if (h)
 				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
 					fprintf(fpAFDS, "Loading language pack from:\n    \x22%s\x22\n", szLangPath);
+					fflush(fpAFDS);
 					pLocPak = malloc((int) len + 1);
 					if (pLocPak)
 					{	__int32 l;
@@ -1517,6 +1537,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				if (h)
 				{
 					fprintf(fpAFDS, "Loading materials list from:\n    \x22%s\x22\n", szMatsPath);
+					fflush(fpAFDS);
 					DWORD lenHi, len = GetFileSize((HANDLE)h, &lenHi);
 					__int32 l;
 					pMaterials = malloc((int) len + 1);
@@ -1535,7 +1556,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				}
 			}
 
-			ProcessMSFSOfficial(szCfgPath, FALSE);
+			ProcessMSFSOfficial(szOfficial, FALSE);
 			// Add the asobo-airport entries to the end of the main list so far
 			__int32 i = 0;
 			while (i < nAsobo)
@@ -1549,20 +1570,24 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		}
 
 		else
-		{
-			fprintf(fpAFDS, "    ---- Cannot find the MSFS Official scenery!\n");
+		{	fprintf(fpAFDS, "    ---- Cannot find the MSFS Official scenery!\n");
+			fflush(fpAFDS);
 			fFoundOk = FALSE;
 		}
 		
-		strcpy(&szCfgPath[fsPathLen], "\\Community\\");
+		strcat(szFSpath, "\\Packages");
+		_chdir(szFSpath);
+		strcpy(szCfgPath, szFSpath);
+		strcat(szCfgPath, "\\Community\\");
 		if (GetFileAttributes(szCfgPath) != INVALID_FILE_ATTRIBUTES)
 		{	fprintf(fpAFDS, "Found MSFS community scenery in: \n  \x22%s\x22\n", szCfgPath);
-			ProcessMSFSCommunity(szCfgPath);
+			fflush(fpAFDS);
+			ProcessMSFSCommunity("Community\\");
 		}
 
 		else
-		{
-			fprintf(fpAFDS, "    ---- Cannot find any Community scenery!\n");
+		{	fprintf(fpAFDS, "    ---- Cannot find any Community scenery!\n");
+			fflush(fpAFDS);
 		}
 
 		// complete the tables (with fiction at present)
@@ -1572,12 +1597,14 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		nVersion = 7;
 		if (fFoundOk)
 		{	fprintf(fpAFDS, "Reading MSFS scenery:\n");
+			fflush(fpAFDS);
 			goto MAINLOOPS;
 		}
 
 		else
 		{	fprintf(fpAFDS, "\n\nCannot find MSFS base scenery! Giving up!\n\n");
 			fprintf(fpAFDS, chLine);
+			fflush(fpAFDS);
 			PostMessage(hWnd, WM_USER, 3, fOk);
 			if (fQuiet) SendMessage(hWnd, WM_CLOSE, 0, 0);
 			return 0;
@@ -1586,6 +1613,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 	fprintf(fpAFDS, "Reading %s scenery:\n", pszSimName[fFSX+1]);	
 	fprintf(fpAFDS, "The CFG file being used is: \x22%s\x22\n", szCfgPath);
+	fflush(fpAFDS);
 
 	while (nArea < 10000)
 	{	if (fUserAbort) return 0;
@@ -1654,9 +1682,11 @@ MAINLOOPS:
 
 	fprintf(fpAFDS, "\n");
 	fprintf(fpAFDS, chLine);
+	fflush(fpAFDS);
 
 	if (fUserAbort) return 0;
 	fWritingFiles = TRUE;
+	if (szMYpath[0]) _chdir(szMYpath);
 							
 	if (pR)
 	{	RWYLIST *p;
@@ -2136,7 +2166,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.126a");
+			SetWindowText(hDlg, "Make Runways: Version 5.128");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2344,6 +2374,7 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 	pch = strrchr(szMyPath, '\\');
 	if (pch) *(pch + 1) = 0;
 	else szMyPath[0] = 0;
+	nMyPathLen = strlen(szMyPath);
 	strcat(szMyPath, "scenery.cfg");
 
 	if (fQuiet)
