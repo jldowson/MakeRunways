@@ -1287,6 +1287,8 @@ void CompleteTables(void)
 	FILE *fpList = fopen("SceneryList.txt", "w");
 	if (fpList)
 	{	int i = 0;
+		fprintf(fpList, "All paths listed are within\n\t%s\n", szMSFSpath);
+		fprintf(fpList, "=========================================================================\n\n");
 		while (i < nArea)
 		{	fprintf(fpList, "%03d\t%s\t%s\n\t%s\n",
 				i + 1, bActive[i] ? "Active" : "Disabled",
