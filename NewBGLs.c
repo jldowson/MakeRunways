@@ -5,10 +5,12 @@
 
 extern char chRwyT[6];
 extern char szParkNames[12][5];
+extern char *pszParkType[];
 extern char szCurrentFilePath[MAX_PATH];
 __int32 nOffsetBase = 0;
 __int64 *pLastSetGateList = 0;
 __int32 fDeletionsPass = 0, nMinRunwayLen = 1500;
+
 BOOL fIncludeWater = FALSE, fMarkJetways = FALSE, fDebugThisEntry = FALSE;;
 BOOL fNoDrawHoldConvert = TRUE; // ### 4900
 
@@ -2865,17 +2867,31 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NGATE *pg = (NGATE *) ((BYTE *) pgh + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
+			__int32 nPark = pjw->wGateName & 0x3f;
+			char chLetter[2];
+			chLetter[0] = nPark + 0x35;
+			chLetter[1] = 0;
+
+			
 			// ############### MSFSTAXIPARK ?? #########
 
-			fprintf(fpAFDS, "          Gate %d has Jetway\n", nGateNum);
+			#ifdef _DEBUG
+				fDebugThisEntry = TRUE;
+			#endif	
+
+				fprintf(fpAFDS, "          %s %s%d has Jetway\n",
+					pszParkType[pjw->wGateName >= 11 ? 10 : pjw->wGateName],
+					(nPark <= 11) ? szParkNames[nPark] : chLetter, nGateNum);
+
+
 			if (fDebugThisEntry)
-				fprintf(fpAFDS,"\nSearching %d entries:\n   ", wCtr);
+				fprintf(fpAFDS,"\nSearching %d entries for GateName %d, Num %d\n   ", wCtr, pjw->wGateName, nGateNum);
 	
 			while (w < wCtr)
 			{	if (fDebugThisEntry)
-					fprintf(fpAFDS,"%d,", (pg->wNumberType >> 4));
+					fprintf(fpAFDS,"%d: Number=%d, Name=%d:%s\n   ", w, (pg->wNumberType >> 4), pg->bPushBackName &0x3F, pszParkType[(pg->bPushBackName & 0x3f) >= 11 ? 10 : (pg->bPushBackName & 0x0f)]);
 
-				if ((pg->wNumberType >> 4) == nGateNum)
+		 		if (((pg->wNumberType >> 4) == nGateNum) && ((pg->bPushBackName & 0x3F) == pjw->wGateName))
             	{	pg->bCodeCount |= 0x80; // Flag Jetway using top bit of code count
 					fJetwayOk = TRUE;
 					break;

@@ -318,7 +318,8 @@ typedef struct _NJETWAY
 {	WORD wId;				// record ID (0x3A)
 	DWORD nLen;				// record length
 	WORD wParkingNumber;	// ref to existing gate (top 12 bits of wNumberType
-	DWORD dwUnkown;
+	WORD wGateName;
+	DWORD nSize; // Size of library object record following
 } NJETWAY;
 
 typedef struct _NGATE2

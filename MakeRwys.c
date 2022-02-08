@@ -5,11 +5,11 @@
 #include "shfolder.h"
 #include <winver.h>
 
-char szMSFSpath[MAX_PATH] = "";
-char szOfficialPath[MAX_PATH] = ""; // Used for shorter pathnames in MSFS
-char szCommunityPath[MAX_PATH] = ""; // Used for shorter pathnames in MSFS
-char szOfficialOnly[MAX_PATH] = ""; // Official appendage to szMSFSpath
-char szLocalPath[MAX_PATH] = ""; // Used to return to loading path
+char szMSFSpath[MY_MAX_PATH] = "";
+char szOfficialPath[MY_MAX_PATH] = ""; // Used for shorter pathnames in MSFS
+char szCommunityPath[MY_MAX_PATH] = ""; // Used for shorter pathnames in MSFS
+char szOfficialOnly[MY_MAX_PATH] = ""; // Official appendage to szMSFSpath
+char szLocalPath[MY_MAX_PATH] = ""; // Used to return to loading path
 
 BOOL fMSFS = FALSE, fLocal = FALSE, fDecCoords = FALSE;
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
@@ -667,6 +667,8 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 
 	nVersion = nVers;
 	
+	fprintf(fpAFDS, "FS version code =#%d\n", nVersion);
+
 	if (nVers >= 4)
 	{	// For Prepar3D v3 - v5, see if AddonOrganizer is available
 		char szAddonsPath[MY_MAX_PATH + 16], szMyPath2[MY_MAX_PATH], *pch;
@@ -696,6 +698,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 		{	strcpy(szAddonsPath, "LorbySceneryExport.exe");
 			strcat(szAddonsPath, " MakeRwys_Scenery.cfg");
 			fprintf(fpAFDS, "Using \x22%s\x22\n", szAddonsPath);
+			fflush(fpAFDS);
 		}
 		
 		if (szAddonsPath[0])
@@ -717,8 +720,11 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 						&pi)) 	// pointer to PROCESS_INFORMATION  
 				
 			{	fprintf(fpAFDS, "LorbySceneryExport executed: ");
+				fflush(fpAFDS);
 				if (WaitForSingleObject(pi.hProcess, 30000) != WAIT_TIMEOUT)
 				{	fprintf(fpAFDS, "Checking for \x22MakeRwys_Scenery.cfg\x22\n");
+					fflush(fpAFDS);
+
 					if (GetFileAttributes("MakeRwys_Scenery.cfg") != INVALID_FILE_ATTRIBUTES)
 					{	pch = strrchr(psz,'\\');
 						if (pch) *pch = 0;
@@ -726,6 +732,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 						return nVers;
 					}
 					fprintf(fpAFDS, "... ERROR: file not created!\n");					
+					fflush(fpAFDS);
 				}
 			}
 
@@ -734,6 +741,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 					GetLastError());					
 		}
 		else fprintf(fpAFDS, "Will be using normal scenery.cfg file ...\n");					
+		fflush(fpAFDS);
 	}
 
 	// Need user path
@@ -1330,11 +1338,10 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	fpAFDS = fopen("Runways.txt","w");
 	if (!fpAFDS)
 	{	if (!fQuiet) MessageBox(NULL, "Error: cannot write Runways.txt file!\nIs it open in an editor?", "MakeRunways Error", MB_ICONSTOP);
-			SendMessage(hWnd, WM_CLOSE, 0, 0);
-			return 0;
+		SendMessage(hWnd, WM_CLOSE, 0, 0);
+		return 0;
 	}
-
-	fprintf(fpAFDS, "Make Runways File: Version 5.128 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.129 by Pete Dowson\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
@@ -1426,8 +1433,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		// Get content list (for disable options)
 		fprintf(fpAFDS, "Looking for:\n   \x22%s\x22\n", "content.xml");
 		
+		pContent = 0;
 		HANDLE h = CreateFile("content.xml", GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-		if (h)
+		if (h != INVALID_HANDLE_VALUE)
 		{	DWORD lenHi, len = GetFileSize((HANDLE) h, &lenHi);
 			__int32 l;
 			pContent = malloc((int) len + 1);
@@ -1445,7 +1453,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		fprintf(fpAFDS, "Now looking for:\n    \x22%s\x22\n", "UserCfg.opt");
 
 		h = CreateFile("UserCfg.opt", GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-		if (h)
+		if (h != INVALID_HANDLE_VALUE)
 		{	fOk = FALSE;
 			__int32 lenHi, len = GetFileSize(h, &lenHi);
 			char* pCfg = malloc((int) len + 1);
@@ -1623,6 +1631,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	fprintf(fpAFDS, "The CFG file being used is: \x22%s\x22\n", szCfgPath);
 	fflush(fpAFDS);
 
+	int nNumLayers = 0;
 	while (nArea < 10000)
 	{	if (fUserAbort) return 0;
 		sprintf(szArea,"Area.%03d", nArea);	
@@ -1636,13 +1645,17 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				if (GetPrivateProfileString(szArea,"Active","", szParam, 64, szCfgPath) &&
 						(_strnicmp(szParam, "TRUE", 4) == 0))
 					bActive[n] = 0xff;
+				nNumLayers++;
 			}
 		}
 		else if (nArea > 999) break;
 
 		nArea++;
 	}
-	
+
+	fprintf(fpAFDS, "%d scenery layers to be processed\n", nNumLayers);
+	fflush(fpAFDS);
+
 MAINLOOPS:
 	if (fMSFS) _chdir(szMSFSpath);
 	nArea = 0;
@@ -1655,7 +1668,8 @@ MAINLOOPS:
 			sprintf(szArea,"Area.%03d", nAreas[nArea]);
 			sprintf(szAreaWk, "%s \x22%s\x22 (Layer=%d)", szArea, szTitles[nArea], nArea);
 			fprintf(fpAFDS, "\n%s%s\n", chLine, szAreaWk);
-			
+			fflush(fpAFDS);
+
 			SetWindowText(GetDlgItem(hWnd, IDC_AREA), szAreaWk);
 			SetWindowText(GetDlgItem(hWnd, IDC_FILE1), "");
 			SetWindowText(GetDlgItem(hWnd, IDC_FILE2), "");
@@ -1663,6 +1677,7 @@ MAINLOOPS:
 
 			if (!bActive[nArea])
 			{	fprintf(fpAFDS, "... Not Active\n");
+				fflush(fpAFDS);
 				nArea++;
 				continue;
 			}
@@ -1675,12 +1690,16 @@ MAINLOOPS:
 			if ((len = strlen(szPaths[nArea])) && (szPaths[nArea][len - 1] == '\\'))
 				szPaths[nArea][len - 1] = 0;
 
+			fprintf(fpAFDS, "Starting deletion pass of layer %d\n", nArea);
+			fflush(fpAFDS);
 			ScanSceneryArea(szPaths[nArea]);
 			if (fUserAbort) return 0;
 
 			if (fDeletionsPass < 0)
 			{	fDeletionsPass = 0;
 				pSceneryName = szTitles[nArea];
+				fprintf(fpAFDS, "Starting data extraction pass of layer %d\n", nArea);
+				fflush(fpAFDS);
 				ScanSceneryArea(szPaths[nArea]);
 				if (fUserAbort) return 0;
 			}
@@ -2181,7 +2200,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.128");
+			SetWindowText(hDlg, "Make Runways: Version 5.129");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
