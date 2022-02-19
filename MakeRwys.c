@@ -1341,7 +1341,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
-	fprintf(fpAFDS, "Make Runways File: Version 5.129 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.13 by Pete Dowson\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
@@ -1899,11 +1899,13 @@ MAINLOOPS:
 									char chILSid[8];
 									float fILSslope;
 								} rbin;
-
+							    char wkn[9];
 								memset(&rbin, sizeof(rbin), 0);
 								*((DWORD *) &rbin.chICAO[0]) =
 									*((DWORD *) &p->r.chICAO[0]);
-								rbin.wRwyNum = atoi(p->r.chRwy);
+								strncpy(wkn, p->r.chRwy, 4);
+								wkn[4] = 0;
+								rbin.wRwyNum = atoi(wkn);
 								rbin.chDesig = chRwyT[rbin.wRwyNum % 10];
 								rbin.wRwyNum /= 10;
 								strcpy(&rbin.chStatus[0], p->fCTO && p->fCL ? "CTL" :
@@ -1921,9 +1923,13 @@ MAINLOOPS:
 								rbin.fMagVar = p->fMagvar;
 								rbin.fLength = p->r.uLen;
 								rbin.fWidth = p->r.uWid;
-								rbin.fILSfreq = (float) (p->r.chILS[0] ? atof(p->r.chILS) : 0.0);
+								strncpy(wkn, p->r.chILS, 8);
+								wkn[8] = 0;
+								rbin.fILSfreq = (float) (p->r.chILS[0] ? atof(wkn) : 0.0);
 								strcpy(&rbin.chILSflags[0], pszILSflags[(p->fILSflags >> 2) & 7]);
-								rbin.fILShdg = (float) atof(p->r.chILSHdg);
+								strncpy(wkn, p->r.chILSHdg, 6);
+								wkn[6] = 0;
+								rbin.fILShdg = (float) atof(wkn);
 								memcpy(&rbin.chILSid[0], &p->r.chILSid[0], 8);
 								rbin.fILSslope = p->r.fILSslope;
 								
@@ -2200,7 +2206,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.129");
+			SetWindowText(hDlg, "Make Runways: Version 5.13");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
