@@ -2629,7 +2629,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 								chWork2, (double) rwy1.r.fLat, (double) rwy1.r.fLong); 
 
 					if (fDebug)
-					{	fprintf(fpAFDS, "### %sRunway1 struct (len=%04X, size=%04x):\n",
+					{	fprintf(fpAFDS, "### %sRunway1 struct (len=%04X, size=%04zu):\n",
 							(pa->wId == OBJTYPE_NEWRUNWAY) ? "New" :
 							(pa->wId == OBJTYPE_MSFSRUNWAY) ? "MSFS" : "", pa->nLen,
 							(pa->wId == OBJTYPE_MSFSRUNWAY) ? OBJTYPE_MSFSRUNWAY_LEN : sizeof(NRWY));
@@ -2689,7 +2689,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 								chWork, (double) rwy2.r.fLat, (double) rwy2.r.fLong); 
 
 					if (fDebug)
-						fprintf(fpAFDS,"### %sRunway2 struct (len=%04X, size=%04x):\n",
+						fprintf(fpAFDS,"### %sRunway2 struct (len=%04X, size=%04zu):\n",
 							(pa->wId == OBJTYPE_NEWRUNWAY) ? "New" : "", pa->nLen, sizeof(NRWY));
 
 					if (pa->wId == OBJTYPE_RUNWAY)
@@ -2925,7 +2925,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			memcpy(rwy1.r.chICAO, chICAO, 4);
 			rwy1.pGateList = (NGATEHDR *) malloc(nThisLen);
 			
-			pLastSetGateList = (int *) malloc(sizeof(__int64) * (wCtr+1));
+			pLastSetGateList = (long long *) malloc(sizeof(__int64) * (wCtr+1));
 			if (pLastSetGateList)
 				pLastSetGateList[0] = (__int32) wCtr | (pa->wId << 16);
 			
