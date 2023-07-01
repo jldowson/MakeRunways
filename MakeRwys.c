@@ -13,7 +13,7 @@ char szLocalPath[MY_MAX_PATH] = ""; // Used to return to loading path
 
 BOOL fMSFS = FALSE, fLocal = FALSE, fDecCoords = FALSE;
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
-__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 MSFS
+__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6, 8 MSFS
 
 #ifdef _DEBUG
 	BOOL fDoMSFS = TRUE;
@@ -32,9 +32,9 @@ extern char *pszGateType[];
 extern __int32 fDeletionsPass, nMinRunwayLen;
 extern BOOL fIncludeWater, fMarkJetways;
 void UpdateTransitionAlts(void);
-char *pszSimName[9] = {
+char *pszSimName[10] = {
 	"FS9", "FSX", "FSX-SE", "Prepar3D", "Prepar3D v2",
-	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "MSFS" };
+	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "Prepar3D v6", "MSFS" };
 char *pPathName = 0;
 char *pSceneryName = 0;
 HINSTANCE hInstance;
@@ -644,9 +644,9 @@ void CheckBGL(FILE *fpIn)
          SetSceneryCfgPath
 ******************************************************************************/
 
-// nVers = 0 FSX, 1 ESP, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5
+// nVers = 0 FSX, 1 ESP, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6
 __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
-{	static char *pszCfgPaths[7] = {
+{	static char *pszCfgPaths[8] = {
 			"\\Microsoft\\FSX\\SCENERY.CFG",
 			"\\Microsoft\\FSX-SE\\SCENERY.CFG",
 			"\\Lockheed Martin\\Prepar3D\\SCENERY.CFG",
@@ -654,7 +654,8 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 			"\\Lockheed Martin\\Prepar3D v3\\SCENERY.CFG",
 			"\\Lockheed Martin\\Prepar3D v4\\SCENERY.CFG",
 			"\\Lockheed Martin\\Prepar3D v5\\SCENERY.CFG",
-	};
+			"\\Lockheed Martin\\Prepar3D v6\\SCENERY.CFG",
+};
 
 	char szPathName[MY_MAX_PATH], szPathAppend[MY_MAX_PATH];
 	char *pchUser, *pchUser2;
@@ -670,7 +671,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 	fprintf(fpAFDS, "FS version code =#%d\n", nVersion);
 
 	if (nVers >= 4)
-	{	// For Prepar3D v3 - v5, see if AddonOrganizer is available
+	{	// For Prepar3D v3 - v6, see if AddonOrganizer is available
 		char szAddonsPath[MY_MAX_PATH + 16], szMyPath2[MY_MAX_PATH], *pch;
 		__int32 len, len2 = MAX_PATH + 64;
 
@@ -1341,7 +1342,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
-	fprintf(fpAFDS, "Make Runways File: Version 5.13 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.131 by Pete Dowson\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
@@ -1357,7 +1358,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 				VerQueryValue(chBlock, TEXT("\\"), (LPVOID*)&pvsf, &cb) &&
 				((pvsf->dwProductVersionMS >> 16) >= 2))
 		{	nVersIndex = 3;
-			if ((pvsf->dwProductVersionMS >> 16) >= 5)
+			if ((pvsf->dwProductVersionMS >> 16) >= 6)
+				nVersIndex = 7;
+			else if ((pvsf->dwProductVersionMS >> 16) >= 5)
 				nVersIndex = 6;
 			else if ((pvsf->dwProductVersionMS >> 16) >= 4)
 				nVersIndex = 5;
@@ -1393,7 +1396,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	
 	if ((fFSX < 0) && fLocal)
 	{	fMSFS = TRUE;
-		nVersion = 7;
+		nVersion = 8;
 
 		strncpy(szLocalPath, szMyPath, nMyPathLen);
 		szLocalPath[nMyPathLen] = 0;
@@ -1610,7 +1613,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		fMSFS = TRUE;
 		CompleteTables();
 
-		nVersion = 7;
+		nVersion = 8;
 		if (fFoundOk)
 		{	fprintf(fpAFDS, "\n\nReading MSFS scenery:\n");
 			fflush(fpAFDS);
