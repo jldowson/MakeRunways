@@ -1335,14 +1335,21 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	memset(&bActive[0], 0, sizeof(bActive));
 
 	ulTotalAPs = ulTotalRwys = 0;
-	if (szLocalPath[0]) _chdir(szLocalPath);
+
+	GetModuleFileName(hInstance, szMyPath, MAX_PATH);
+	char *pch = strrchr(szMyPath, '\\');
+	if (pch) *(pch + 1) = 0;
+	else szMyPath[0] = 0;
+	nMyPathLen = strlen(szMyPath);
+
+	if (szMyPath[0]) _chdir(szMyPath);
 	fpAFDS = fopen("Runways.txt","w");
 	if (!fpAFDS)
 	{	if (!fQuiet) MessageBox(NULL, "Error: cannot write Runways.txt file!\nIs it open in an editor?", "MakeRunways Error", MB_ICONSTOP);
 		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
-	fprintf(fpAFDS, "Make Runways File: Version 5.131 by Pete Dowson\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.132 by Pete Dowson, updates by pointy56\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
@@ -1510,7 +1517,11 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		if (GetFileAttributes(szOfficialPath) == INVALID_FILE_ATTRIBUTES)
 		{	// Not MS Store, try Steam version:
 			strcpy(szOfficialPath, szMSFSpath);
+#ifdef _pointy56
+			strcpy(szOfficialOnly, "Official\\MakeRwy\\");
+#else
 			strcpy(szOfficialOnly, "Official\\Steam\\");
+#endif
 			strcat(szOfficialPath, szOfficialOnly);
 			
 			fprintf(fpAFDS, "    ---- not found, trying:\n    \x22%s\x22\n", szOfficialPath);
@@ -2028,7 +2039,7 @@ MAINLOOPS:
 							NGATE *pg = (NGATE *) ((BYTE *) p->pGateList + sizeof(NGATEHDR));
 							NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 							NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
-							if (pgh->wId == OBJTYPE_MSFSTAXIPARK) pg2 = (NGATE2 *) pg;
+							NGATE4 *pg4 = (NGATE4 *) ((pgh->wId == OBJTYPE_MSFSTAXIPARK) ? pg : 0);
 
 							while (w < wCtr)
 							{	LOCATION locg;
@@ -2036,22 +2047,41 @@ MAINLOOPS:
 								char chLetter[4], *pszLetter;
 								__int32 nPark = pg->bPushBackName & 0x3f;
 								BOOL fMyAirlineGate = FALSE;
+								char* pszGateSuffix, chGateSuffix[2];
+
+								pszGateSuffix = "";
 			
 								if (nPark <= 11)
+								{
 									pszLetter = szParkNames[nPark];
-								
+
+									if (pg4 && pg4->bSuffix > 0)
+									{
+										chGateSuffix[0] = pg4->bSuffix + 0x35;
+										chGateSuffix[1] = 0;
+										pszGateSuffix = &chGateSuffix[0];
+									}
+								}
+
 								else
 								{	chLetter[0] = nPark + 0x35;
 									chLetter[1] = 0;
 									pszLetter = &chLetter[0];
+
+									if (pg4 && pg4->bSuffix > 0)
+									{
+										chGateSuffix[0] = pg4->bSuffix + 0x35;
+										chGateSuffix[1] = 0;
+										pszGateSuffix = &chGateSuffix[0];
+									}
 								}
 
 								SetLocPos(&locg, 0,
-									pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
-									pg3 ? pg3->nLon : pg2 ? pg2->nLon : pg->nLon, 0, 0, &dLat, &dLon);								
-								fprintf(pfg, "%.4s,%s,%d,%.6f,%.6f,%.1f,%.1f,%d%s", 
+									pg4 ? pg4->nLat : pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
+									pg4 ? pg4->nLon : pg3 ? pg3->nLon : pg2 ? pg2->nLon : pg->nLon, 0, 0, &dLat, &dLon);
+								fprintf(pfg, "%.4s,%s,%d%s,%.6f,%.6f,%.1f,%.1f,%d%s", 
 									p->r.chICAO, pszLetter,
-									pg->wNumberType >> 4, dLat, dLon, 
+									pg->wNumberType >> 4, pszGateSuffix, dLat, dLon,
 									(double) pg->fRadius, (double) pg->fHeading, pg->wNumberType & 15,
 									(fMarkJetways && (pg->bCodeCount & 0x80)) ? ",Jetway" : ",");
 
@@ -2074,28 +2104,46 @@ MAINLOOPS:
 								if (fMyAirlineGate)
 								{	char *pszGateName, chGateName[5];
 	
+									pszGateSuffix = "";
+
 									pg->bPushBackName &= 0x3f;
 									if (pg->bPushBackName > 11)
 									{	chGateName[0] = pg->bPushBackName + 0x35;
 										chGateName[1] = 0;
 										pszGateName = &chGateName[0];
+
+										if (pg4 && pg4->bSuffix > 0)
+										{
+											chGateSuffix[0] = pg4->bSuffix + 0x35;
+											chGateSuffix[1] = 0;
+											pszGateSuffix = &chGateSuffix[0];
+										}
 									}
 	
-									else pszGateName = szParkNames[pg->bPushBackName];
+									else
+									{
+										pszGateName = szParkNames[pg->bPushBackName];
+										if (pg4 && pg4->bSuffix > 0)
+										{
+											chGateSuffix[0] = pg4->bSuffix + 0x35;
+											chGateSuffix[1] = 0;
+											pszGateSuffix = &chGateSuffix[0];
+										}
+									}
+
 								
-									fprintf(pfmyg, "%.4s, %s %s%d (%s)\x0d\x0a", 
+									fprintf(pfmyg, "%.4s, %s %s%d%s (%s)\x0d\x0a", 
 											p->r.chICAO,
 											pszParkType[pg->bPushBackName >= 11 ? 10 : pg->bPushBackName],
-											pszGateName, pg->wNumberType >> 4, pszGateType[pg->wNumberType & 15]);
+											pszGateName, pg->wNumberType >> 4, pszGateSuffix, pszGateType[pg->wNumberType & 15]);
 								}
 
 								w++;
 								pg = (NGATE *) ((BYTE *) pg + (4 * (int) (pg->bCodeCount & 0x7f)) +
-										(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
-								if (pgh->wId == OBJTYPE_MSFSTAXIPARK)
-									pg = (NGATE*)((BYTE*)pg + 20); // 20 additional bytes
+										(pg4 ? sizeof(NGATE4) : pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
 								if (pg2) pg2 = (NGATE2 *) pg;
 								if (pg3) pg3 = (NGATE3 *) pg;
+								if (pg4) pg4 = (NGATE4 *) pg;
 							}
 						}
 
@@ -2209,7 +2257,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.13");
+			SetWindowText(hDlg, "Make Runways: Version 5.132 by Pete Dowson, updates by pointy56");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2412,12 +2460,12 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 		pch = strchr(pch, '/');
 	}
 
-	GetModuleFileName(hInstance, szMyPath, MAX_PATH);
-
-	pch = strrchr(szMyPath, '\\');
-	if (pch) *(pch + 1) = 0;
-	else szMyPath[0] = 0;
-	nMyPathLen = strlen(szMyPath);
+	//GetModuleFileName(hInstance, szMyPath, MAX_PATH);
+	//
+	//pch = strrchr(szMyPath, '\\');
+	//if (pch) *(pch + 1) = 0;
+	//else szMyPath[0] = 0;
+	//nMyPathLen = strlen(szMyPath);
 	strcat(szMyPath, "scenery.cfg");
 
 	if (fQuiet)

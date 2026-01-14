@@ -357,6 +357,27 @@ typedef struct _NGATE3
 	__int32 nAlt;
 } NGATE3;
 
+typedef struct _NGATE4
+{
+	BYTE bPushBackName;		// pushback and name fields: it is a
+							// combination of the above PARKING_NAME_XXX
+							// and PARKING_PUSHB_XXX constants
+	WORD wNumberType;		// combination of number and type
+							// low part of the low byte part stores
+							// PARK_TYPE_XXX defined above
+							// subtract the constant to the word and
+							// obtain the number multiplied by 16
+	BYTE bCodeCount;		// number of airline codes stored in this entry
+	float fRadius;			// radius of parking (in meters)
+	float fHeading;			// heading in degrees
+	BYTE bUnknown[16];		// Added in FSX
+	__int32 nLon;			// longitude in packed format
+	__int32 nLat;			// latitude in packed format
+	BYTE bUnknown2;			// ??
+	BYTE bSuffix;			// Gate suffix letter - 0x00 = none, 0x0C = A, 0x0D = B, etc.
+	BYTE bUnknown3[18];		// ?? 
+} NGATE4;
+
 #define BIT_DELETE_ALL_APPROACHES		0x01
 #define BIT_DELETE_ALL_APRONS			0x04
 #define BIT_DELETE_ALL_FREQUENCIES		0x08

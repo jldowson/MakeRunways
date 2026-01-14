@@ -27,7 +27,7 @@ char *pszGateType[] =
 				{	"?", "GA Ramp", "GA Ramp Small", "GA Ramp Medium", "GA Ramp Large",
 					"Cargo Ramp", "Mil Cargo Ramp", "Mil Combat Ramp",
 					"Small Gate", "Medium Gate", "Heavy Gate", "GA Dock",
-					"?", "Vehicles", "?", "?" };
+					"Fuel", "Vehicles", "?", "?" };
 				
 
 // runway surfaces
@@ -2867,6 +2867,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NGATE *pg = (NGATE *) ((BYTE *) pgh + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pgh->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pgh->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
+			NGATE4 *pg4 = (NGATE4 *) ((pgh->wId == OBJTYPE_MSFSTAXIPARK) ? pg : 0);
 			__int32 nPark = pjw->wGateName & 0x3f;
 			char chLetter[2];
 			chLetter[0] = nPark + 0x35;
@@ -2898,9 +2899,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				}
 
 				w++;
-				pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) + (pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
+				pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) + (pg4 ? sizeof(NGATE4) : pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
 				if (pg2) pg2 = (NGATE2 *) pg;
 				if (pg3) pg3 = (NGATE3 *) pg;
+				if (pg4) pg4 = (NGATE4 *) pg;
 			}
 
 			if (fDebugThisEntry)
@@ -2916,7 +2918,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NGATE *pg = (NGATE *) ((BYTE *) pa + sizeof(NGATEHDR));
 			NGATE2 *pg2 = (NGATE2 *) ((pa->wId == OBJTYPE_NEWTAXIPARK) ? pg : 0);
 			NGATE3 *pg3 = (NGATE3 *) ((pa->wId == OBJTYPE_NEWNEWTAXIPARK) ? pg : 0);
-			if (pa->wId == OBJTYPE_MSFSTAXIPARK) pg2 = (NGATE2 *) pg;
+			NGATE4 *pg4 = (NGATE4 *) ((pa->wId == OBJTYPE_MSFSTAXIPARK) ? pg : 0);
 
 			nThisLen = pgh->nLen;
 
@@ -2938,22 +2940,39 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				LOCATION locg;
 				float fLat, fLon;
 				char *pszGateName, chGateName[5];
+				char* pszGateSuffix, chGateSuffix[2];
+
+				pszGateSuffix = "";
 
 				pg->bPushBackName &= 0x3f;
 				if (pg->bPushBackName > 11)
 				{	chGateName[0] = pg->bPushBackName + 0x35;
 					chGateName[1] = 0;
 					pszGateName = &chGateName[0];
+					if (pg4 && pg4->bSuffix > 0)
+					{
+						chGateSuffix[0] = pg4->bSuffix + 0x35;
+						chGateSuffix[1] = 0;
+						pszGateSuffix = &chGateSuffix[0];
+					}
 				}
 
-				else pszGateName = szParkNames[pg->bPushBackName];
-				
-				fprintf(fpAFDS, "          %s %s%d [#G%d]:  ", 
+				else
+				{
+					pszGateName = szParkNames[pg->bPushBackName];
+					if (pg4 && pg4->bSuffix > 0)
+					{
+						chGateSuffix[0] = pg4->bSuffix + 0x35;
+						chGateSuffix[1] = 0;
+						pszGateSuffix = &chGateSuffix[0];
+					}
+				}
+				fprintf(fpAFDS, "          %s %s%d%s [#G%d]:  ", 
 					pszParkType[pg->bPushBackName >= 11 ? 10 : pg->bPushBackName],
-					pszGateName, pg->wNumberType >> 4, w);
+					pszGateName, pg->wNumberType >> 4, pszGateSuffix, w);
 				SetLocPos(&locg, 0, 
-					pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
-					pg3 ? pg3->nLon : pg2 ? pg2->nLon : pg->nLon,
+					pg4 ? pg4->nLat : pg3 ? pg3->nLat : pg2 ? pg2->nLat : pg->nLat,
+					pg4 ? pg4->nLon : pg3 ? pg3->nLon : pg2 ? pg2->nLon : pg->nLon,
 					&fLat, &fLon, 0, 0);
 				WritePosition(&locg, 0);
 				fprintf(fpAFDS, "\n");
@@ -2965,7 +2984,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				if (pg->bCodeCount & 0x7f)
 				{	BYTE b = pg->bCodeCount & 0x7f;
 					char *pA = (char *) pg +
-						(pg3 ? sizeof(NGATE3) :
+						(pg4 ? sizeof(NGATE4) :
+						pg3 ? sizeof(NGATE3) :
 						pg2 ? sizeof(NGATE2) :
 						sizeof(NGATE));
 					fprintf(fpAFDS, "              Airlines:");
@@ -2981,11 +3001,10 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				w++;
 				pLastSetGateList[w] = (__int64) pg; // Index for use in Taxipath decode
 				pg = (NGATE *) ((BYTE *) pg + (4 * (pg->bCodeCount & 0x7f)) + 
-					(pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
-				if (pa->wId == OBJTYPE_MSFSTAXIPARK)
-					pg = (NGATE*) ((BYTE *) pg + 20); // 20 additional bytes
+					(pg4 ? sizeof(NGATE4) : pg3 ? sizeof(NGATE3) : pg2 ? sizeof(NGATE2) : sizeof(NGATE)));
 				if (pg2) pg2 = (NGATE2 *) pg;
 				if (pg3) pg3 = (NGATE3 *) pg;
+				if (pg4) pg4 = (NGATE4 *) pg;
 			}
 		}
 		
