@@ -1,4 +1,5 @@
 // Thanks are due to Alessandro G. Antonini, author of BGLXML, for much of this data
+#include <windows.h>
 extern char *pPathName;
 extern char *pSceneryName;
 extern char* pMaterials;
@@ -52,6 +53,8 @@ typedef struct _NOBJ
 
 // Objects IDs
 #define OBJTYPE_AIRPORT_MSFS 0x0056
+#define OBJTYPE_AIRPORT_MSFS2024  0x0113
+#define OBJTYPE_AIRPORT_MSFS2024_LEN 0x005C
 #define OBJTYPE_AIRPORT		0x0003
 #define OBJTYPE_RUNWAY		0x0004
 #define OBJTYPE_START		0x0011
@@ -162,8 +165,8 @@ typedef struct MSFSRUNWAY
 typedef struct tag_offset_threshold_t
 {
 	WORD wId;				// 0 record ID
-							//			0x5 = primary end threshold
-							//			0x6 = secondary end threshold
+							// 0x5 = primary end threshold
+							// 0x6 = secondary end threshold
 	DWORD nLen;				// 2 length of record
 	WORD wSurface;			// 6 threshold surface
 	float fLength;			// 8 threshold length

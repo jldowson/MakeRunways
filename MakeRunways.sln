@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30204.135
+# Visual Studio Version 18
+VisualStudioVersion = 18.7.11919.86
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MakeRunways", "MakeRunways.vcxproj", "{49FDC094-8243-4C6C-BCAA-F2A75DB59E75}"
 EndProject

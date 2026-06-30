@@ -1,9 +1,11 @@
-/* MakeRwys.c
+/******************************************************************************
+MakeRwys.c by ItalianCharter Team by Gjanosh61 @2026
 *******************************************************************************/
 
 #include "MakeRwys.h"
 #include "shfolder.h"
 #include <winver.h>
+#include <ctype.h>
 
 char szMSFSpath[MY_MAX_PATH] = "";
 char szOfficialPath[MY_MAX_PATH] = ""; // Used for shorter pathnames in MSFS
@@ -12,14 +14,14 @@ char szOfficialOnly[MY_MAX_PATH] = ""; // Official appendage to szMSFSpath
 char szLocalPath[MY_MAX_PATH] = ""; // Used to return to loading path
 
 BOOL fMSFS = FALSE, fLocal = FALSE, fDecCoords = FALSE;
+BOOL fUTF8Output = FALSE; // Default legacy: Windows-1252. Use /UTF8 for UTF-8 XML output.
+BOOL fBglCompXmlOutput = FALSE; // Experimental MSFS2024 SDK/BglComp XML export.
+char chBglCompICAOFilter[9] = ""; // Optional /BGLCOMPICAO=<ident> filter.
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
-__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6, 8 MSFS
+__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6, 8 MSFS, 9 MSFS V2
 
-#ifdef _DEBUG
-	BOOL fDoMSFS = TRUE;
-#else
-	BOOL fDoMSFS = TRUE;
-#endif
+
+BOOL fDoMSFS = TRUE;
 
 __int32 errnum = 0;
 __int32 nMatchMyAirline = 0;
@@ -31,10 +33,11 @@ extern char *pszParkType[];
 extern char *pszGateType[];
 extern __int32 fDeletionsPass, nMinRunwayLen;
 extern BOOL fIncludeWater, fMarkJetways;
+extern char chWk[1024];
 void UpdateTransitionAlts(void);
-char *pszSimName[10] = {
+char *pszSimName[11] = {
 	"FS9", "FSX", "FSX-SE", "Prepar3D", "Prepar3D v2",
-	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "Prepar3D v6", "MSFS" };
+	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "Prepar3D v6", "MSFS", "MSFS v2" };
 char *pPathName = 0;
 char *pSceneryName = 0;
 HINSTANCE hInstance;
@@ -145,7 +148,7 @@ unsigned long lmultdiv(unsigned long m1, unsigned long m2, unsigned long d, __in
 	double res = ((m1d * m2d) + dr) / dd;
 	double resi;
 
-	modf(res, &resi);
+	(void)modf(res, &resi);
 
 	return (unsigned long) resi;
 }
@@ -189,7 +192,7 @@ double Heading(unsigned long i, unsigned short f, __int32 fZeroOk)
 	}
 
 	else
-	{	modf(r, &ri);
+	{	(void)modf(r, &ri);
 		if (ri < 1.0) r += 360.0;
 	}
 
@@ -659,7 +662,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 
 	char szPathName[MY_MAX_PATH], szPathAppend[MY_MAX_PATH];
 	char *pchUser, *pchUser2;
-	HANDLE hDir;
+	HANDLE hDir = INVALID_HANDLE_VALUE;
 	HANDLE hFile;
 
 	WIN32_FIND_DATA fd;
@@ -720,8 +723,11 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 						&sui,	// pointer to STARTUPINFO 
 						&pi)) 	// pointer to PROCESS_INFORMATION  
 				
-			{	fprintf(fpAFDS, "LorbySceneryExport executed: ");
+			{	BOOL fLorbyCfgReady = FALSE;
+
+				fprintf(fpAFDS, "LorbySceneryExport executed: ");
 				fflush(fpAFDS);
+
 				if (WaitForSingleObject(pi.hProcess, 30000) != WAIT_TIMEOUT)
 				{	fprintf(fpAFDS, "Checking for \x22MakeRwys_Scenery.cfg\x22\n");
 					fflush(fpAFDS);
@@ -730,11 +736,19 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 					{	pch = strrchr(psz,'\\');
 						if (pch) *pch = 0;
 						strcat(psz, "\\MakeRwys_Scenery.cfg");
-						return nVers;
+						fLorbyCfgReady = TRUE;
 					}
-					fprintf(fpAFDS, "... ERROR: file not created!\n");					
-					fflush(fpAFDS);
+					else
+					{	fprintf(fpAFDS, "... ERROR: file not created!\n");					
+						fflush(fpAFDS);
+					}
 				}
+
+				CloseHandle(pi.hThread);
+				CloseHandle(pi.hProcess);
+
+				if (fLorbyCfgReady)
+					return nVers;
 			}
 
 			else
@@ -811,7 +825,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 			}
 		}
 
-		if (fSearching)
+		if (fSearching && (hDir != INVALID_HANDLE_VALUE))
 			fSearching = FindNextFile(hDir, &fd);
 	}
 
@@ -823,8 +837,7 @@ __int32 SetSceneryCfgPath(char *psz, __int32 nVers)
 ******************************************************************************/
 
 void StartXML(FILE *pfi)
-{	fprintf(pfi,"<?xml version=\"1.0\" encoding=\"Windows-1252\" ?>\x0d\x0a");
-	//fprintf(pfi,"<?xml version=\"1.0\"?>\x0d\x0a");
+{	fprintf(pfi, "<?xml version=\"1.0\" encoding=\"%s\" ?>\x0d\x0a", fUTF8Output ? "UTF-8" : "Windows-1252");
 	fprintf(pfi,"<data>\x0d\x0a");	
 	fprintf(pfi, "<SimVersion>%s</SimVersion>\x0d\x0a", pszSimName[nVersion + 1]);
 }
@@ -835,43 +848,52 @@ void StartXML(FILE *pfi)
 
 char *StringXML(char *pszTo, char *pszFrom)
 {	char *pszNow = pszTo;
-	while (*pszFrom)
-	{	if (*pszFrom == '&')
-		{	strcpy(pszNow, "&amp;");
-			pszNow += 5;
-		}
-	
-		else if (*pszFrom == 0x22)
-		{	strcpy(pszNow, "&quot;");
-			pszNow += 6;
-		}
+	__int32 nLeft = 1023; // chWk is currently declared as chWk [1024]
+	while (*pszFrom && (nLeft > 0))
+	{	unsigned char ch = (unsigned char)*pszFrom;
+		const char *pszEntity = 0;
 
-		else if (*pszFrom == 0x27)
-		{	strcpy(pszNow, "&apos;");
-			pszNow += 6;
-		}
-	
-		else if (*pszFrom == '<')
-		{	strcpy(pszNow, "&lt;");
-			pszNow += 4;
-		}
-	
-		else if (*pszFrom == '>')
-		{	strcpy(pszNow, "&gt;");
-			pszNow += 4;
-		}
+		if (ch == '&')
+			pszEntity = "&amp;";
+		else if (ch == 0x22)
+			pszEntity = "&quot;";
+		else if (ch == 0x27)
+			pszEntity = "&apos;";
+		else if (ch == '<')
+			pszEntity = "&lt;";
+		else if (ch == '>')
+			pszEntity = "&gt;";
 
-		/*************************
-		else if ((*pszFrom == 0xA1) && (*(pszFrom + 1) == 0xF6))
-		{	strcpy(pszNow, "#");
-			pszNow++;
-			pszFrom++;
-		}
-		//************************/
+		if (pszEntity)
+		{
+			__int32 nEntityLen = (__int32)strlen(pszEntity);
 
+			if (nEntityLen > nLeft)
+				break;
+
+			strcpy(pszNow, pszEntity);
+			pszNow += nEntityLen;
+			nLeft -= nEntityLen;	
+		}
 		else 
-		{	*pszNow = *pszFrom;
-			pszNow++;
+		{ 
+			/*
+			XML 1.0 does not allow most control characters.
+			Keep TAB, LF and CR; replace other C0 control bytes.
+			Also replace undefined Windows-1252 byte values.
+			*/
+			if (((ch < 0x20) && (ch != 0x99) && (ch != 0x0A) && (ch != 0x0D))||
+				(ch == 0x81) || (ch == 0x8D) || (ch == 0x8F) ||
+				(ch == 0x90) || (ch == 0x9D))
+			{
+				*pszNow++ = '?';
+			}
+			else
+			{
+				*pszNow++ = (char) ch;				
+			}
+
+			nLeft--;
 		}
 
 		pszFrom++;
@@ -881,6 +903,588 @@ char *StringXML(char *pszTo, char *pszFrom)
 	
 	return pszTo;
 }
+
+/******************************************************************************
+         GetICAOText
+******************************************************************************/
+
+static char *GetICAOText(RWYLIST *p, char *pszOut)
+{
+	memset(pszOut, 0, 9);
+
+	if (p->chICAOFull[0])
+	{
+		strncpy(pszOut, p->chICAOFull, 8);
+		pszOut[8] = 0;
+	}
+	else
+	{
+		memcpy(pszOut, p->r.chICAO, 4);
+		pszOut[4] = 0;
+
+		if (pszOut[3] == ' ')
+			pszOut[3] = 0;
+	}
+
+	return pszOut;
+}
+
+/******************************************************************************
+        CSVField
+******************************************************************************/
+
+static void CSVField(FILE *pf, const char *psz)
+{
+	fputc('"', pf);
+
+	if (psz)
+	{
+		while (*psz)
+		{
+			unsigned char ch = (unsigned char)*psz;
+
+			if (ch == '"')
+				fputc('"', pf);
+
+			if ((ch < 0x20) && (ch != 0x09))
+				fputc(' ', pf);
+			else
+				fputc(ch, pf);
+
+			psz++;
+		}
+	}
+
+	fputc('"', pf);
+}
+
+/******************************************************************************
+        IsRunwayLikeRecord
+******************************************************************************/
+
+static BOOL IsRunwayLikeRecord(RWYLIST *p)
+{
+	return (!p->fDelete &&
+			!p->fAirport &&
+			!p->pGateList &&
+			!p->pTaxiwayList &&
+			p->r.chRwy[3]);
+}
+
+/******************************************************************************
+        SameICAOPrefix4
+******************************************************************************/
+
+static BOOL SameICAOPrefix4(RWYLIST *p1, RWYLIST *p2)
+{
+	return (memcmp(p1->r.chICAO, p2->r.chICAO, 4) == 0);
+}
+
+/******************************************************************************
+        AirportHasRunwayLikeRecord
+******************************************************************************/
+
+static BOOL AirportHasRunwayLikeRecord(RWYLIST *pAirport, const char *pszICAO)
+{
+	RWYLIST *p;
+	char chICAOText[9];
+
+	p = pAirport->pFrom;
+	while (p && SameICAOPrefix4(p, pAirport))
+	{
+		if (IsRunwayLikeRecord(p))
+		{
+			GetICAOText(p, chICAOText);
+			if (strcmp(chICAOText, pszICAO) == 0)
+				return TRUE;
+		}
+
+		p = p->pFrom;
+	}
+
+	p = pAirport->pTo;
+	while (p && SameICAOPrefix4(p, pAirport))
+	{
+		if (IsRunwayLikeRecord(p))
+		{
+			GetICAOText(p, chICAOText);
+			if (strcmp(chICAOText, pszICAO) == 0)
+				return TRUE;
+		}
+
+		p = p->pTo;
+	}
+
+	return FALSE;
+}
+
+/******************************************************************************
+        WriteMSFS2024HeliportsFile
+******************************************************************************/
+
+static void WriteMSFS2024HeliportsFile(void)
+{
+	FILE *phf;
+	RWYLIST *p;
+	DWORD nWritten = 0;
+
+	if (nVersion != 9)
+		return;
+
+	phf = fopen("heliports_msfs2024.csv", "wb");
+	if (!phf)
+	{
+		fprintf(fpAFDS, "\nWARNING: unable to create heliports_msfs2024.csv\n");
+		return;
+	}
+
+	fprintf(phf,
+		"ICAO,Latitude,Longitude,AltitudeFt,MagVar,File,SceneryName,AirportName,Source\r\n");
+
+	p = pR;
+	while (p)
+	{
+		if (!p->fDelete && p->fAirport)
+		{
+			char chICAOText[9];
+			__int32 nLen;
+			char szFullPath[2 * MAX_PATH];
+
+			GetICAOText(p, chICAOText);
+			nLen = (__int32)strlen(chICAOText);
+
+			if ((nLen >= 5) && (nLen <= 8) &&
+				!AirportHasRunwayLikeRecord(p, chICAOText))
+			{
+				szFullPath[0] = 0;
+
+				if (fMSFS)
+				{
+					strcpy_s(szFullPath, sizeof(szFullPath), "\\\\?\\");
+					strcat_s(szFullPath, sizeof(szFullPath), szMSFSpath);
+				}
+
+				strcat_s(szFullPath, sizeof(szFullPath),
+					p->pPathName ? p->pPathName : "????");
+
+				CSVField(phf, chICAOText);
+				fprintf(phf, ",%.6f,%.6f,%.2f,%.3f,",
+					(double)p->r.fLat,
+					(double)p->r.fLong,
+					(double)(p->r.fAlt + 0.005),
+					(double)p->fMagvar);
+
+				CSVField(phf, szFullPath);
+				fprintf(phf, ",");
+
+				CSVField(phf, p->pSceneryName ? p->pSceneryName : "");
+				fprintf(phf, ",");
+
+				CSVField(phf, p->pAirportName ? p->pAirportName : "");
+				fprintf(phf, ",MSFS2024_AIRPORT_NO_RUNWAY\r\n");
+
+				nWritten++;
+			}
+		}
+
+		p = p->pTo;
+	}
+
+	fclose(phf);
+
+	fprintf(fpAFDS,
+		"\nMSFS2024 heliports file: %lu entries written to heliports_msfs2024.csv\n",
+		nWritten);
+}
+
+
+/******************************************************************************
+        CopyCommandToken
+******************************************************************************/
+
+static char *CopyCommandToken(char *pszTo, size_t cbTo, const char *pszFrom)
+{
+	size_t n = 0;
+
+	if (!pszTo || !cbTo)
+		return pszTo;
+
+	pszTo[0] = 0;
+
+	if (!pszFrom)
+		return pszTo;
+
+	while (*pszFrom && (*pszFrom != '/') && !isspace((unsigned char)*pszFrom) && (n + 1 < cbTo))
+	{
+		pszTo[n++] = (char)toupper((unsigned char)*pszFrom);
+		pszFrom++;
+	}
+
+	pszTo[n] = 0;
+
+	return pszTo;
+}
+
+/******************************************************************************
+        CopyFixedTrim
+******************************************************************************/
+
+static char *CopyFixedTrim(char *pszTo, size_t cbTo, const char *pszFrom, size_t cbFrom)
+{
+	size_t n = 0;
+
+	if (!pszTo || !cbTo)
+		return pszTo;
+
+	pszTo[0] = 0;
+
+	if (!pszFrom)
+		return pszTo;
+
+	while ((n < cbFrom) && (n + 1 < cbTo) && pszFrom[n])
+	{
+		pszTo[n] = pszFrom[n];
+		n++;
+	}
+
+	pszTo[n] = 0;
+
+	while (n && ((pszTo[n - 1] == ' ') || (pszTo[n - 1] == '\t')))
+	{
+		pszTo[n - 1] = 0;
+		n--;
+	}
+
+	return pszTo;
+}
+
+/******************************************************************************
+        BglCompRunwayDesignator
+******************************************************************************/
+
+static const char *BglCompRunwayDesignator(BYTE bDesignator)
+{
+	switch (bDesignator & 7)
+	{
+	case 1: return "LEFT";
+	case 2: return "RIGHT";
+	case 3: return "CENTER";
+	case 4: return "WATER";
+	default: return "NONE";
+	}
+}
+
+/******************************************************************************
+        BglCompRunwayNumber
+******************************************************************************/
+
+static char *BglCompRunwayNumber(RWYLIST *p, char *pszOut, size_t cbOut)
+{
+	if (!pszOut || !cbOut)
+		return pszOut;
+
+	pszOut[0] = 0;
+
+	if (!p)
+		return pszOut;
+
+	if (cbOut >= 3)
+	{
+		pszOut[0] = p->r.chRwy[1];
+		pszOut[1] = p->r.chRwy[2];
+		pszOut[2] = 0;
+	}
+
+	if (!pszOut[0] || (pszOut[0] == ' '))
+		strcpy_s(pszOut, cbOut, "0");
+
+	return pszOut;
+}
+
+/******************************************************************************
+        BglCompRunwaySurface
+******************************************************************************/
+
+static const char *BglCompRunwaySurface(RWYLIST *p)
+{
+	if (!p)
+		return "UNKNOWN";
+
+	if (p->r.chSurfNew > 24)
+		return szRwySurf[(p->r.chSurf > 12) ? 0 : p->r.chSurf];
+
+	return szNRwySurf[p->r.chSurfNew];
+}
+
+/******************************************************************************
+        BglCompSameICAO
+******************************************************************************/
+
+static BOOL BglCompSameICAO(RWYLIST *p, const char *pszICAO)
+{
+	char chICAOText[9];
+
+	if (!p || !pszICAO || !pszICAO[0])
+		return FALSE;
+
+	GetICAOText(p, chICAOText);
+
+	return (_stricmp(chICAOText, pszICAO) == 0);
+}
+
+/******************************************************************************
+        BglCompAirportAlreadyWritten
+******************************************************************************/
+
+static BOOL BglCompAirportAlreadyWritten(RWYLIST *pAirport)
+{
+	RWYLIST *p;
+	char chICAOText[9];
+
+	if (!pAirport)
+		return FALSE;
+
+	GetICAOText(pAirport, chICAOText);
+
+	p = pR;
+	while (p && (p != pAirport))
+	{
+		if (!p->fDelete && p->fAirport && BglCompSameICAO(p, chICAOText))
+			return TRUE;
+
+		p = p->pTo;
+	}
+
+	return FALSE;
+}
+
+/******************************************************************************
+        BglCompAirportHasExportableRunway
+******************************************************************************/
+
+static BOOL BglCompAirportHasExportableRunway(const char *pszICAO)
+{
+	RWYLIST *p;
+
+	p = pR;
+	while (p)
+	{
+		if (IsRunwayLikeRecord(p) && (p->r.chRwy[3] < '4') && BglCompSameICAO(p, pszICAO))
+			return TRUE;
+
+		p = p->pTo;
+	}
+
+	return FALSE;
+}
+
+/******************************************************************************
+        WriteBglCompRunwayIls
+******************************************************************************/
+
+static void WriteBglCompRunwayIls(FILE *pf, RWYLIST *p)
+{
+	char chFreq[16];
+	char chHdg[16];
+	char chIdent[16];
+	char chName[64];
+	double dFreq;
+	double dHdg;
+
+	if (!pf || !p || !p->r.chILS[0])
+		return;
+
+	CopyFixedTrim(chFreq, sizeof(chFreq), p->r.chILS, sizeof(p->r.chILS));
+	CopyFixedTrim(chHdg, sizeof(chHdg), p->r.chILSHdg, sizeof(p->r.chILSHdg));
+	CopyFixedTrim(chIdent, sizeof(chIdent), p->r.chILSid, sizeof(p->r.chILSid));
+	CopyFixedTrim(chName, sizeof(chName), p->r.chNameILS, sizeof(p->r.chNameILS));
+
+	if (!chFreq[0] || !chIdent[0])
+		return;
+
+	dFreq = atof(chFreq);
+	dHdg = chHdg[0] ? atof(chHdg) : p->fHdg;
+
+	fprintf(pf,
+		"      <Ils lat=\"%.8f\" lon=\"%.8f\" alt=\"%.2fF\" heading=\"%.3f\" frequency=\"%.2f\" magvar=\"%.3f\" ident=\"%s\"",
+		(double)p->r.fLat,
+		(double)p->r.fLong,
+		(double)(p->r.fAlt + 0.005),
+		dHdg,
+		dFreq,
+		(double)p->fMagvar,
+		StringXML(chWk, chIdent));
+
+	if (chName[0])
+		fprintf(pf, " name=\"%s\"", StringXML(chWk, chName));
+
+	if (((p->fILSflags >> 2) & 1) != 0)
+		fprintf(pf, " backCourse=\"TRUE\"");
+
+	if (p->r.fILSslope > 0.0f)
+	{
+		fprintf(pf, ">\r\n");
+		fprintf(pf,
+			"        <GlideSlope lat=\"%.8f\" lon=\"%.8f\" alt=\"%.2fF\" pitch=\"%.2f\"/>\r\n",
+			(double)p->r.fLat,
+			(double)p->r.fLong,
+			(double)(p->r.fAlt + 0.005),
+			(double)p->r.fILSslope);
+		fprintf(pf, "      </Ils>\r\n");
+	}
+	else
+	{
+		fprintf(pf, "/>\r\n");
+	}
+}
+
+/******************************************************************************
+        WriteBglCompXmlFile
+******************************************************************************/
+
+static void WriteBglCompXmlFile(void)
+{
+	FILE *pf;
+	RWYLIST *pAirport;
+	DWORD nAirports = 0;
+	DWORD nRunways = 0;
+	DWORD nIls = 0;
+
+	if (!fBglCompXmlOutput)
+		return;
+
+	if (!chBglCompICAOFilter[0])
+	{
+		fprintf(fpAFDS, "\nMSFS2024 BglComp XML pilot export skipped: use /BGLCOMPICAO=<ident> to select one airport.\n");
+		return;
+	}
+
+	pf = fopen("msfs2024_bglcomp.xml", "wb");
+	if (!pf)
+	{
+		fprintf(fpAFDS, "\nWARNING: unable to create msfs2024_bglcomp.xml\n");
+		return;
+	}
+
+	fprintf(pf, "<?xml version=\"1.0\" encoding=\"%s\" ?>\r\n", fUTF8Output ? "UTF-8" : "Windows-1252");
+	fprintf(pf, "<FSData version=\"9.0\">\r\n");
+	fprintf(pf, "  <!-- Experimental ITC MakeRunways MSFS2024 BglComp XML export. -->\r\n");
+	fprintf(pf, "  <!-- Initial pilot writer: Airport + Runway + Ils/GlideSlope only. -->\r\n");
+
+	pAirport = pR;
+	while (pAirport)
+	{
+		if (!pAirport->fDelete && pAirport->fAirport)
+		{
+			char chICAOText[9];
+			RWYLIST *pRunway;
+
+			GetICAOText(pAirport, chICAOText);
+
+			if (_stricmp(chICAOText, chBglCompICAOFilter) != 0)
+			{
+				pAirport = pAirport->pTo;
+				continue;
+			}
+
+			if (BglCompAirportAlreadyWritten(pAirport))
+			{
+				pAirport = pAirport->pTo;
+				continue;
+			}
+
+			if (!BglCompAirportHasExportableRunway(chICAOText))
+			{
+				pAirport = pAirport->pTo;
+				continue;
+			}
+
+			fprintf(pf,
+				"  <Airport lat=\"%.8f\" lon=\"%.8f\" alt=\"%.2fF\" magvar=\"%.3f\" ident=\"%s\"",
+				(double)pAirport->r.fLat,
+				(double)pAirport->r.fLong,
+				(double)(pAirport->r.fAlt + 0.005),
+				(double)pAirport->fMagvar,
+				StringXML(chWk, chICAOText));
+
+			if (pAirport->pAirportName && pAirport->pAirportName[0])
+				fprintf(pf, " name=\"%s\"", StringXML(chWk, pAirport->pAirportName));
+
+			fprintf(pf, " airportTestRadius=\"5000F\">\r\n");
+
+			pRunway = pR;
+			while (pRunway)
+			{
+				if (IsRunwayLikeRecord(pRunway) &&
+					(pRunway->r.chRwy[3] < '4') &&
+					BglCompSameICAO(pRunway, chICAOText))
+				{
+					char chRunwayNumber[4];
+					const char *pszSurface = BglCompRunwaySurface(pRunway);
+					const char *pszDesignator = BglCompRunwayDesignator((BYTE)pRunway->r.chRwy[3]);
+					const char *pszPrimaryPattern = (pRunway->r.bPatternFlags & 4) ? "RIGHT" : "LEFT";
+					const char *pszSecondaryPattern = (pRunway->r.bPatternFlags & 32) ? "RIGHT" : "LEFT";
+
+					BglCompRunwayNumber(pRunway, chRunwayNumber, sizeof(chRunwayNumber));
+
+					fprintf(pf,
+						"    <Runway lat=\"%.8f\" lon=\"%.8f\" alt=\"%.2fF\" surface=\"%s\" heading=\"%.3f\" length=\"%uF\" width=\"%uF\" number=\"%s\" designator=\"%s\" primaryTakeoff=\"%s\" primaryLanding=\"%s\" secondaryTakeoff=\"%s\" secondaryLanding=\"%s\" primaryPattern=\"%s\" secondaryPattern=\"%s\"",
+						(double)pRunway->fLat,
+						(double)pRunway->fLong,
+						(double)(pRunway->r.fAlt + 0.005),
+						StringXML(chWk, (char *)pszSurface),
+						(double)pRunway->fHdg,
+						(unsigned int)pRunway->r.uLen,
+						(unsigned int)pRunway->r.uWid,
+						chRunwayNumber,
+						pszDesignator,
+						pRunway->fCTO ? "FALSE" : "TRUE",
+						pRunway->fCL ? "FALSE" : "TRUE",
+						pRunway->fCTO ? "FALSE" : "TRUE",
+						pRunway->fCL ? "FALSE" : "TRUE",
+						pszPrimaryPattern,
+						pszSecondaryPattern);
+
+					if (pRunway->r.fPatternAlt > 0.0f)
+						fprintf(pf, " patternAltitude=\"%.0fF\"", (double)(pRunway->r.fPatternAlt + 0.5));
+
+					if (pRunway->r.chILS[0])
+					{
+						fprintf(pf, ">\r\n");
+						WriteBglCompRunwayIls(pf, pRunway);
+						fprintf(pf, "    </Runway>\r\n");
+						nIls++;
+					}
+					else
+					{
+						fprintf(pf, "/>\r\n");
+					}
+
+					nRunways++;
+				}
+
+				pRunway = pRunway->pTo;
+			}
+
+			fprintf(pf, "  </Airport>\r\n");
+			nAirports++;
+		}
+
+		pAirport = pAirport->pTo;
+	}
+
+	fprintf(pf, "</FSData>\r\n");
+	fclose(pf);
+
+	fprintf(fpAFDS,
+		"\nMSFS2024 BglComp XML file: %lu airports, %lu runways, %lu ILS entries written to msfs2024_bglcomp.xml%s%s\n",
+		(unsigned long)nAirports,
+		(unsigned long)nRunways,
+		(unsigned long)nIls,
+		chBglCompICAOFilter[0] ? " for ICAO " : "",
+		chBglCompICAOFilter[0] ? chBglCompICAOFilter : "");
+}
+
 
 /******************************************************************************
 			CheckTables
@@ -942,12 +1546,12 @@ void ScanSceneryArea(char *pszPath)
 	HANDLE hFind;
 	__int32 fpos;
 			
-	strncpy(szParam, pszPath, MAX_PATH);		
-	fpos = strlen(szParam);
+	strncpy_s(szParam, sizeof(szParam), pszPath, _TRUNCATE);
+	fpos = (__int32)strlen(szParam);
 	if (fDeletionsPass > 0) fprintf(fpAFDS, "Path(Local/Remote)=%s\n", szParam);
 
 	if (!fMSFS)
-	{	strcat(szParam, "\\scenery");
+	{	strcat_s(szParam, sizeof(szParam), "\\scenery");
 		if ((GetFileAttributes(szParam) != FILE_ATTRIBUTE_DIRECTORY) && (fpos > 8) &&
 			(_strnicmp(&szParam[fpos - 8], "\\scenery", 8) == 0))
 			// Scenery path is complete already!
@@ -956,7 +1560,7 @@ void ScanSceneryArea(char *pszPath)
 			fpos += 8;
 	}
 
-	strcat_s(szParam, MAX_PATH, "\\*.bgl");
+	strcat_s(szParam, sizeof(szParam), "\\*.bgl");
 	fpos++;
 	hFind = FindFirstFile(szParam, (WIN32_FIND_DATA *) &find);
 	while (hFind != INVALID_HANDLE_VALUE)
@@ -1014,7 +1618,34 @@ void ScanSceneryArea(char *pszPath)
 			pNextPathName += strlen(pNextPathName) + 1;
 
 			if (fpIn)
-			{	BOOL fDone = FALSE;
+			{
+				BOOL fDone = FALSE;
+				__int64 fileSize64 = 0;
+				DWORD bglFileSize = 0;
+
+				/*
+					MSFS2024 VFSProjection può riportare una dimensione
+					placeholder pari a 1 byte.
+
+					Ricaviamo sempre la dimensione reale dal flusso aperto,
+					sia nel deletion pass sia nel data extraction pass.
+				*/
+				if ((_fseeki64(fpIn, 0, SEEK_END) != 0) ||
+					((fileSize64 = _ftelli64(fpIn)) <= 0) ||
+					(fileSize64 > (__int64)MAXDWORD) ||
+					(_fseeki64(fpIn, 0, SEEK_SET) != 0))
+				{
+					fprintf(
+						fpAFDS,
+						"!!!! FAILED: unable to determine actual BGL file size: %s\n",
+						szParam);
+
+					fclose(fpIn);
+					fpIn = NULL;
+					goto NEXT_FILE;
+				}
+
+				bglFileSize = (DWORD)fileSize64;
 
 				// See if file contains AFDs:
 				if ((fFS9 >= 0) && (fread(&nbglhdr, 1, sizeof(NBGLHDR), fpIn) >= 
@@ -1024,7 +1655,7 @@ void ScanSceneryArea(char *pszPath)
 					if (nbglhdr.wStamp == 0x0201)
 					{	// New BGL format for FS2004?
 						strcpy(szCurrentFilePath, szParam);
-						CheckNewBGL(fpIn, &nbglhdr, find.nFileSizeLow);
+						CheckNewBGL(fpIn, &nbglhdr, bglFileSize);
 						fDone = TRUE;
 						if (fDebug) CheckTables(szParam);
 					}
@@ -1072,6 +1703,115 @@ __int32 nAsobo = 0;
 char szOtherPaths[1000][MY_MAX_PATH];
 __int32 nOther = 0;
 
+/*****************************************************************************
+		AddMSFS2024VFSSceneryFolders
+******************************************************************************/
+
+BOOL AddMSFS2024VFSSceneryFolders(void)
+{
+	char szVFSBase[MY_MAX_PATH];
+	char szSearchPath[MY_MAX_PATH];
+	char *pszLocalAppData;
+	HANDLE hFind;
+	WIN32_FIND_DATA fd;
+	int nAdded = 0;
+
+	pszLocalAppData = getenv("LOCALAPPDATA");
+
+	if (!pszLocalAppData || !pszLocalAppData[0])
+	{
+		fprintf(fpAFDS, "MSFS v2: LOCALAPPDATA not available.\n");
+		fflush(fpAFDS);
+		return FALSE;
+	}
+
+	strcpy_s(szVFSBase, MY_MAX_PATH, pszLocalAppData);
+	strcat_s(szVFSBase, MY_MAX_PATH, "\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalState\\VFSProjection\\scenery\\");
+
+	fprintf(fpAFDS, "\nChecking MSFS v2 VFS Projection scenery:\n   \"%s\"\n", szVFSBase);
+	fflush(fpAFDS);
+
+	if (GetFileAttributes(szVFSBase) == INVALID_FILE_ATTRIBUTES)
+	{
+		fprintf(fpAFDS, "    ---- MSFS v2 VFS Projection scenery not found.\n");
+		fprintf(fpAFDS, "\nTo scan MSFS2024 streamed scenery:\n");
+		fprintf(fpAFDS, " 1. Start MSFS2024\n");
+		fprintf(fpAFDS, " 2. Enable Developer Mode\n");
+		fprintf(fpAFDS, " 3. Tools > Virtual File System\n");
+		fprintf(fpAFDS, " 4. VFS Projector > Start\n");
+		fprintf(fpAFDS, " 5. Run MakeRwys.exe again\n\n");
+		fflush(fpAFDS);
+		return FALSE;
+	}
+
+	strcpy_s(szMSFSpath, MY_MAX_PATH, szVFSBase);
+	_chdir(szMSFSpath);
+
+
+	strcpy_s(szSearchPath, MY_MAX_PATH, szVFSBase);
+	strcat_s(szSearchPath, MY_MAX_PATH, "*.*");
+
+	hFind = FindFirstFile(szSearchPath, &fd);
+
+	if (hFind == INVALID_HANDLE_VALUE)
+	{
+		fprintf(fpAFDS, "    ---- Cannot enumerate MSFS v2 VFS scenery folders;\n");
+		fflush(fpAFDS);
+		return FALSE;
+	}
+
+	fprintf(fpAFDS, "\nAdding MSFS v2 VFS scenery folders:\n");
+
+
+	do
+	{
+		if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+			strcmp(fd.cFileName, ".") != 0 &&
+			strcmp(fd.cFileName, "..") != 0)
+		{
+			BOOL fNumericFolder = TRUE;
+			int i;
+
+			if (strlen(fd.cFileName) != 4)
+				fNumericFolder = FALSE;
+
+			for (i = 0; fNumericFolder && i < 4; i++)
+			{
+				if (fd.cFileName[i] < '0'  || fd.cFileName[i] > '9')
+					fNumericFolder = FALSE;
+			}
+
+			if (fNumericFolder)
+			{
+				if (nArea >= 10000)
+				{
+					fprintf(fpAFDS, "    ---- Too many scenery areas. Stopping VFS folder scan.\n");
+					break;
+				}
+
+				strcpy_s(szPaths[nArea], MAX_PATH, fd.cFileName);
+				strcat_s(szPaths[nArea], MAX_PATH, "\\");
+
+				fprintf(fpAFDS, "   [%03d] %s\n", nArea +1, szPaths[nArea]);
+
+
+				nArea++;
+				nAdded++;
+			}
+		}
+		
+
+	} while (FindNextFile(hFind, &fd));
+
+	FindClose(hFind);
+
+	fprintf(fpAFDS, "MSFS v2 VFS folder added: %d\n", nAdded);
+	fflush(fpAFDS);
+
+
+	return(nAdded > 0);	
+}
+
 /******************************************************************************
 		 ProcessMSFSCommunity
 ******************************************************************************/
@@ -1081,7 +1821,7 @@ void ProcessMSFSCommunity(char* pPath)
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
 
-	fprintf(fpAFDS, "***** Processing MSFS community scenery \n\t\x22%\\s%s\x22\n", szCommunityPath, pPath);
+	fprintf(fpAFDS, "***** Processing MSFS community scenery \n\t\x22%s%s\x22\n", szCommunityPath, pPath);
 	fflush(fpAFDS);
 
 	strcpy_s(szPath, MY_MAX_PATH, pPath);
@@ -1330,6 +2070,9 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 {	char szArea[512], szParam[64];
 	char szCfgPath[MY_MAX_PATH];
 	BOOL fOk = 0, fFSX = -1, fFoundOk = TRUE;;
+
+	pR = NULL;
+	pRlast = NULL;
 	
 	memset(&nAreas[0], 0xff, sizeof(nAreas));
 	memset(&bActive[0], 0, sizeof(bActive));
@@ -1349,7 +2092,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
-	fprintf(fpAFDS, "Make Runways File: Version 5.132 by Pete Dowson, updates by pointy56\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.132 by Pete Dowson, updates by Gjanosh61\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
@@ -1358,7 +2101,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	if (GetFileAttributes("Prepar3D.EXE") != INVALID_FILE_ATTRIBUTES)
 	{	__int32 nVersIndex = 2;
 		VS_FIXEDFILEINFO *pvsf = 0;
-		char chBlock[16384];
+		static char chBlock[16384];
 		UINT cb;
 
 		if (GetFileVersionInfo("Prepar3D.EXE", 0, 2048, chBlock) &&
@@ -1424,6 +2167,28 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	{	// See if it is MSFS, in MS Store location
 		char szCopyPath[MY_MAX_PATH];
 
+		// First try MSFS v2 / MSFS2024 via Virtual File System projection
+		fprintf(fpAFDS, "\nDEBUG: MSFS branch reached. Trying MSFS v2 VFS Projection first.\n");
+		fflush(fpAFDS);
+		strncpy(szLocalPath, szMyPath, nMyPathLen);
+		szLocalPath[nMyPathLen] = 0;
+
+		if (AddMSFS2024VFSSceneryFolders())
+		{
+			fMSFS = TRUE;
+			nVersion = 9;
+
+			fprintf(fpAFDS, "\nMSFS v2 VFS Projection found and selected.\n");
+			fprintf(fpAFDS, "\n\nReading MSFS v2 scenery via VFS Projection:\n");
+			fflush(fpAFDS);
+
+			CompleteTables();
+			goto MAINLOOPS;
+		}
+
+		fprintf(fpAFDS, "\nMSFS v2 VFS Projection not selected. Falling back to MSFS legacy scan.\n\n");
+		fflush(fpAFDS);
+
 		//strcpy(szCfgPath, "\\\\?\\");
 		strncpy(szLocalPath, szMyPath, nMyPathLen);
 		szLocalPath[nMyPathLen] = 0;
@@ -1446,13 +2211,23 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		pContent = 0;
 		HANDLE h = CreateFile("content.xml", GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 		if (h != INVALID_HANDLE_VALUE)
-		{	DWORD lenHi, len = GetFileSize((HANDLE) h, &lenHi);
-			__int32 l;
-			pContent = malloc((int) len + 1);
-			ReadFile((HANDLE) h, pContent, len, &l, NULL);
-			pContent[len] = 0;
-			CloseHandle((HANDLE) h);
-			fprintf(fpAFDS, "    ---- okay, Content list loaded\n");
+		{	DWORD lenHi = 0, len = GetFileSize(h, &lenHi);
+			DWORD l = 0;
+
+			pContent = malloc((size_t)len + 1);
+			if (pContent && ReadFile(h, pContent, len, &l, NULL))
+			{	pContent[l] = 0;
+				fprintf(fpAFDS, "    ---- okay, Content list loaded\n");
+			}
+			else
+			{	if (pContent)
+				{	free(pContent);
+					pContent = NULL;
+				}
+				fprintf(fpAFDS, "    ---- failed to read Content list\n");
+			}
+
+			CloseHandle(h);
 		}
 
 		else
@@ -1470,21 +2245,23 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 
 			if (pCfg)
 			{
-				__int32 l;
-				ReadFile(h, pCfg, len, &l, NULL);
-				pCfg[len] = 0;
+				DWORD l = 0;
 
-				char* psz = strstr(pCfg, "InstalledPackagesPath");
-				if (psz)
-				{
-					psz = strchr(psz, '\x22');
+				if (ReadFile(h, pCfg, len, &l, NULL))
+				{	pCfg[l] = 0;
+
+					char* psz = strstr(pCfg, "InstalledPackagesPath");
 					if (psz)
 					{
-						strcpy(szMSFSpath, &psz[1]);
-						psz = strchr(szMSFSpath, '\x22');
-						if (psz) *psz = 0;
-						strcat(szMSFSpath, "\\");
-						fOk = TRUE;
+						psz = strchr(psz, '\x22');
+						if (psz)
+						{
+							strcpy(szMSFSpath, &psz[1]);
+							psz = strchr(szMSFSpath, '\x22');
+							if (psz) *psz = 0;
+							strcat(szMSFSpath, "\\");
+							fOk = TRUE;
+						}
 					}
 				}
 
@@ -1538,20 +2315,24 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			strcat_s(szLangPath, MY_MAX_PATH, "fs-base\\en-US.locPak");
 			if (GetFileAttributes(szLangPath) != INVALID_FILE_ATTRIBUTES)
 			{	HANDLE h = CreateFile(szLangPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-				if (h)
-				{	DWORD lenHi, len = GetFileSize(h, &lenHi);
+				if (h != INVALID_HANDLE_VALUE)
+				{	DWORD lenHi = 0, len = GetFileSize(h, &lenHi);
+					DWORD l = 0;
+
 					fprintf(fpAFDS, "Loading language pack from:\n    \x22%s\x22\n", szLangPath);
 					fflush(fpAFDS);
-					pLocPak = malloc((int) len + 1);
-					if (pLocPak)
-					{	__int32 l;
-						ReadFile(h, pLocPak, len, &l, NULL);
-						pLocPak[len] = 0;
+
+					pLocPak = malloc((size_t)len + 1);
+					if (pLocPak && ReadFile(h, pLocPak, len, &l, NULL))
+					{	pLocPak[l] = 0;
 					}
 					else
-					{	free(pLocPak);
-						pLocPak = 0;
+					{	if (pLocPak)
+						{	free(pLocPak);
+							pLocPak = 0;
+						}
 					}
+
 					CloseHandle(h);
 				}
 			}
@@ -1563,25 +2344,28 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			if (GetFileAttributes(szMatsPath) != INVALID_FILE_ATTRIBUTES)
 			{
 				HANDLE h = CreateFile(szMatsPath, GENERIC_READ, 0, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
-				if (h)
+				if (h != INVALID_HANDLE_VALUE)
 				{
+					DWORD lenHi = 0, len = GetFileSize(h, &lenHi);
+					DWORD l = 0;
+
 					fprintf(fpAFDS, "Loading materials list from:\n    \x22%s\x22\n", szMatsPath);
 					fflush(fpAFDS);
-					DWORD lenHi, len = GetFileSize((HANDLE)h, &lenHi);
-					__int32 l;
-					pMaterials = malloc((int) len + 1);
-					if (pMaterials)
+
+					pMaterials = malloc((size_t)len + 1);
+					if (pMaterials && ReadFile(h, pMaterials, len, &l, NULL))
 					{
-						ReadFile((HANDLE)h, pMaterials, len, &l, NULL);
-						pMaterials[len] = 0;
+						pMaterials[l] = 0;
 					}
 					else
 					{
-						free(pMaterials);
-						pMaterials = 0;
+						if (pMaterials)
+						{	free(pMaterials);
+							pMaterials = 0;
+						}
 					}
-					
-					CloseHandle((HANDLE)h);
+									
+					CloseHandle(h);
 				}
 			}
 
@@ -1788,9 +2572,12 @@ MAINLOOPS:
 							((p->r.chRwy[3] >= '4') || (fIncludeWater >= 0)) &&
 							!p->pGateList && !p->pTaxiwayList &&
 						p->r.chRwy[3]) // This last eliminates 998 and 999 maker entries
-				{	if (p->r.chICAO[3] == ' ') p->r.chICAO[3] = 0;
-					fprintf(pf,"%.4s,%.4s,%.6f,%.6f,%d,%d,%d,%.6s\x0d\x0a",
-								p->r.chICAO, p->r.chRwy,
+				{	char chICAOText[9];
+
+					GetICAOText(p, chICAOText);
+
+					fprintf(pf,"%s,%.4s,%.6f,%.6f,%d,%d,%d,%.6s\x0d\x0a",
+								chICAOText, p->r.chRwy,
 								(double) p->r.fLat, (double) p->r.fLong,
 								(int) (p->r.fAlt + 0.5), p->r.uHdg,
 								p->r.uLen, p->r.chILS[0] ? p->r.chILS : "0");
@@ -1819,7 +2606,7 @@ MAINLOOPS:
 
 		if (pf || pf2 || pfi)
 			{	static char *pszILSflags[] = {	"", "B", "G", "BG", "D", "BD", "DG", "BDG" };
-				DWORD dwCurrentICAO = 0;
+				char chCurrentICAO[9] = "";
 					
 				while (p)
 				{	RWYLIST *pLast = p;
@@ -1832,14 +2619,19 @@ MAINLOOPS:
 							ftmi = FALSE;
 						}
 
-						if (*((DWORD *) p->r.chICAO) != dwCurrentICAO)
-						{	if (dwCurrentICAO)
+						char chICAOText[9];
+
+						GetICAOText(p, chICAOText);
+
+						if (strcmp(chICAOText, chCurrentICAO) != 0)
+						{
+							if (chCurrentICAO[0])
 								fprintf(pfi, "</ICAO>\x0d\x0a");
-								
-							dwCurrentICAO = *((DWORD *) p->r.chICAO);
-							
-							fprintf(pfi, "<ICAO id=\"%.4s\">\x0d\x0a<ICAOName>%s</ICAOName>\x0d\x0a",
-								p->r.chICAO,
+
+							strcpy(chCurrentICAO, chICAOText);
+
+							fprintf(pfi, "<ICAO id=\"%s\">\x0d\x0a<ICAOName>%s</ICAOName>\x0d\x0a",
+								chICAOText,
 								StringXML(chWk, p->pAirportName ? p->pAirportName : ""));
 							fprintf(pfi, "<Country>%s</Country>\x0d\x0a",
 								StringXML(chWk, p->pCountryName ? p->pCountryName : ""));
@@ -2208,25 +3000,33 @@ MAINLOOPS:
 				if (pftbin) fclose(pftbin);
 				if (pfi)
 				{	if (ftmi) StartXML(pfi);
-					if (dwCurrentICAO) 	fprintf(pfi, "</ICAO>\x0d\x0a");
+					if (chCurrentICAO[0]) 	fprintf(pfi, "</ICAO>\x0d\x0a");
 					fprintf(pfi,"</data>\x0d\x0a");
 					fclose(pfi);
 				}
 				fOk |= 2;
 			}
 
+		WriteBglCompXmlFile();
+
 		while (pR)
-		{	RWYLIST *pLast = pR;
-			if (pR->pGateList) free(pR->pGateList);
-			if (pR->pTaxiwayList) free(pR->pTaxiwayList);
+		{
+			RWYLIST *pLast = pR;
 			pR = pR->pTo;
+			if (pLast->pGateList) free(pLast->pGateList);
+			if (pLast->pTaxiwayList) free(pLast->pTaxiwayList);
 			free(pLast);
 		}
+
+		pRlast = NULL;
 	}
 
 	MakeHelipadsFile();
 	MakeCommsFile();
 	if (fProcessTA)	UpdateTransitionAlts();
+
+	ReportGlobalNvxIlsV9Index();
+	FreeGlobalNvxIlsV9Index();
 
 	fprintf(fpAFDS, "\nMax filepath length used for BGL search: %d\n", maxpathlen);
 
@@ -2249,7 +3049,7 @@ MAINLOOPS:
          DlgProc
 ******************************************************************************/
 
-BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
+INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {	static HBRUSH hbrMain = NULL;
 	PAINTSTRUCT ps;
 	char wk[256];
@@ -2257,7 +3057,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.132 by Pete Dowson, updates by pointy56");
+			SetWindowText(hDlg, "Make Runways: Version 5.132 by Pete Dowson, updates by Gjanosh61");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
@@ -2325,7 +3125,7 @@ BOOL CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 			point.x = point.y = 0;
 			ClientToScreen(hDlg, &point);
 			SetBrushOrgEx((HDC) wParam, point.x, point.y, NULL);
-			return ((DWORD) hbrMain);
+			return ((INT_PTR) hbrMain);
 		}
 	}
 
@@ -2350,8 +3150,11 @@ LRESULT CALLBACK NullWndProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lPar
 	return DefWindowProc(hwnd, message, wParam, lParam);
 }
 
-int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
-	LPSTR lpszCmdLine, int nCmdShow)
+int WINAPI WinMain(
+	_In_ HINSTANCE hInst,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPSTR lpszCmdLine,
+	_In_ int nCmdShow)
 {
 	char* pch = &lpszCmdLine[0];
 	MSG msg;
@@ -2410,6 +3213,28 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 		{
 			fDecCoords = TRUE;
 			pch += 5;
+		}
+
+		else if (_strnicmp(&pch[1], "UTF8", 4) ==0)
+
+		{
+			fUTF8Output = TRUE;
+			pch +=5;			
+		}
+
+		else if (_strnicmp(&pch[1], "BGLCOMPXML", 10) == 0)
+
+		{
+			fBglCompXmlOutput = TRUE;
+			pch += 11;
+		}
+
+		else if (_strnicmp(&pch[1], "BGLCOMPICAO=", 12) == 0)
+
+		{
+			fBglCompXmlOutput = TRUE;
+			CopyCommandToken(chBglCompICAOFilter, sizeof(chBglCompICAOFilter), pch + 13);
+			pch += 13 + strlen(chBglCompICAOFilter);
 		}
 
 		else if (pch[1] == '>')
@@ -2505,7 +3330,7 @@ int CALLBACK WinMain(HINSTANCE hInst, HINSTANCE hPrevInstance,
 
 	while (GetMessage(&msg, NULL, 0, 0))
 	{
-		if (!IsDialogMessage(hWnd, (LPMSG)&msg))
+		if (!hWnd || !IsDialogMessage(hWnd, (LPMSG)&msg))
 		{
 			TranslateMessage(&msg);
 			DispatchMessage(&msg);
@@ -2539,17 +3364,41 @@ void UpdateTransitionAlts(void)
 
 	fseek(fpM4, 0, SEEK_END);
 	nLenM4 = ftell(fpM4);
-	chM4 = malloc(2*(int) nLenM4); // Room for expansion
 	fseek(fpM4, 0, SEEK_SET);
 
 	fseek(fpDAT, 0, SEEK_END);
 	nLenDAT = ftell(fpDAT);
-	chDAT = malloc((int) nLenDAT+1);
 	fseek(fpDAT, 0, SEEK_SET);
 
-	nLenM4 = fread(chM4, 1, nLenM4, fpM4);
-	nLenDAT = fread(chDAT, 1, nLenDAT, fpDAT);
-	chM4[nLenM4] = chDAT[nLenDAT] = 0;
+	if ((nLenM4 <= 0) || (nLenDAT <= 0))
+	{
+		fprintf(fpAFDS, "**** The /+T option is ignored because transition-altitude input files are empty or invalid. ****\x0d\x0a");
+		fclose(fpM4);
+		fclose(fpDAT);
+		return;
+	}
+
+	chM4 = malloc((size_t)nLenM4 * 2 + 1); // Room for expansion + terminator
+	chDAT = malloc((size_t)nLenDAT + 1);
+
+	if (!chM4 || !chDAT)
+	{
+		fprintf(fpAFDS, "**** The /+T option is ignored because memory allocation failed. ****\x0d\x0a");
+
+		if (chM4) free(chM4);
+		if (chDAT) free(chDAT);
+
+		fclose(fpM4);
+		fclose(fpDAT);
+		return;
+	}
+
+	nLenM4 = (int)fread(chM4, 1, (size_t)nLenM4, fpM4);
+	nLenDAT = (int)fread(chDAT, 1, (size_t)nLenDAT, fpDAT);
+
+	chM4[nLenM4] = 0;
+	chDAT[nLenDAT] = 0;
+
 	fclose(fpM4);
 	fclose(fpDAT);
 

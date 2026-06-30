@@ -3,6 +3,10 @@
 
 #include "MakeRwys.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 /******************************************************************************
          Data
 ******************************************************************************/
@@ -55,7 +59,7 @@ void DeleteComms(char *pchICAO)
 char* FindAirportName(char* pchICAO)
 {	RWYLIST* p = pR;
 	while (p)
-	{	if (strnicmp(pchICAO, p->r.chICAO, 4) == 0)
+	{	if (_strnicmp(pchICAO, p->r.chICAO, 4) == 0)
 			return p->pAirportName;
 		p = p->pTo;
 	}
@@ -130,14 +134,16 @@ void MakeCommsFile(void)
 	FILE* pfx2 = fopen("f4x.csv", "wb");
 	FILE *pt = fopen("runways.txt","rb");
 	__int32 i = 0, j = 0;
-	COMMSENTRY c[CLIST_MAX];
+	COMMSENTRY *c = calloc(CLIST_MAX, sizeof(COMMSENTRY));
 	char *pch2 = 0, *pch = 0, *pchData = 0;
 	char chPrevICAO[5], *pchICAO = 0;
-	memset(&chPrevICAO[0], 0, 5);
+	chPrevICAO[0] = 0;
+	chPrevICAO[1] = 0;
+	chPrevICAO[2] = 0;
+	chPrevICAO[3] = 0;
+	chPrevICAO[4] = 0;
 
-	__try{
-
-	if (nComms && pf && pf2 && pfx2 && pt)
+	if (nComms && pf && pf2 && pfx && pfx2 && pt && c)
 	{	if (pchICAO) strncpy(chPrevICAO, pchICAO, 4);
 		pchICAO = pCommsList[0].chICAO;
 		
@@ -253,7 +259,8 @@ void MakeCommsFile(void)
 					}
 	
 					// Set up for next ICAO	
-					pchICAO = pCommsList[i].chICAO;
+					if (i < nComms)
+						pchICAO = pCommsList[i].chICAO;
 					j = 0;
 					errnum = 11;
 				}
@@ -400,14 +407,7 @@ void MakeCommsFile(void)
 	if (pf) fclose(pf);
 	if (pfx2) fclose(pfx2);
 	if (pfx) fclose(pfx);
-
-	// Exception Handler
-	}
-	__except(	EXCEPTION_EXECUTE_HANDLER)	
-	{	fprintf(fpAFDS, "\n\n***ERROR %d: pch2=%08X, pch=%08X, j=%d, pchData=%08X\n",
-			errnum, (DWORD) pch2, (DWORD) pch, j, (DWORD) pchData);
-		fprintf(fpAFDS, "          prevICAO=%s, thisICAO=%.4s\n", chPrevICAO, pchICAO);
-	}
+	if (c) free(c);
 }
 
 /******************************************************************************

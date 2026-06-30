@@ -1,6 +1,7 @@
 ///////////////////////////////////////////////////////////
 // 56 bytes initial header
 ///////////////////////////////////////////////////////////
+#include <windows.h>
 typedef struct _tag_facdata_hdr
 {
 	WORD wStamp;			//  0 0x0201
@@ -21,14 +22,16 @@ typedef struct _tag_facdata_hdr
 } NBGLHDR;
 
 typedef struct _tag_objs
-{	DWORD unk;
-	int chunkctr;
-	DWORD chunkoff;
-	DWORD chunksize;
+{	DWORD unk;			// legacy unknown; v9 packed QMID32
+	int chunkctr;		// legacy chunk count; v9 itemCount
+	DWORD chunkoff;		// absolute payload offset
+	DWORD chunksize;	// payload size in bytes
 } NOBJ;
 
 // Objects IDs
 #define OBJTYPE_AIRPORT_MSFS 0x0056
+#define OBJTYPE_AIRPORT_MSFS2024  0x0113
+#define OBJTYPE_AIRPORT_MSFS2024_LEN 0x005C
 #define OBJTYPE_AIRPORT		0x0003
 #define OBJTYPE_RUNWAY		0x0004
 #define OBJTYPE_VOR			0x0013
@@ -51,12 +54,91 @@ typedef struct _tag_objs
  */
 typedef struct tag_obj_table_group
 {
-	DWORD nObjType;			//  0 object type, see constansts above
-	DWORD nUnk1;			//  4 unknown integer 1
-	DWORD nGroupsCount;		//  8 number of object groups
-	DWORD nGroupOffset;		// 12 absolute pointer to groups info table
-	DWORD nTableSize;		// 16 size  of info table array pointed by nGroupOffset
+	DWORD nObjType;			//  0 layer/object type
+	DWORD nUnk1;			//  4 v9 modeFlags; bit 0x00010000 = QMID64
+	DWORD nGroupsCount;		//  8 subsection count
+	DWORD nGroupOffset;		// 12 absolute offset of subsection index
+	DWORD nTableSize;		// 16 subsection-index size in bytes
 } NSECTS;
+
+
+/*=========================================================================
+    MSFS2024 BGL v9 container (confirmed with BglExplorer v0.9)
+
+    This is the outer BGL container, not an airport record. Offsets in layer
+    descriptors and QMID subsection entries are absolute file offsets.
+  =========================================================================*/
+
+#define BGL_V9_MAGIC                       0x19920201UL
+#define BGL_V9_HEADER_SIZE                 0x00000038UL
+#define BGL_V9_LAYER_DESCRIPTOR_SIZE       0x00000014UL
+#define BGL_V9_QMID32_ENTRY_SIZE           0x00000010UL
+#define BGL_V9_QMID64_ENTRY_SIZE           0x00000014UL
+#define BGL_V9_QMID64_FLAG                 0x00010000UL
+
+/* Known v9 layer IDs recovered from BglExplorer's dispatch table. */
+#define BGL_LAYER_AIRPORT                  3UL
+#define BGL_LAYER_VOR                      19UL
+#define BGL_LAYER_NDB                      23UL
+#define BGL_LAYER_MARKER                   24UL
+#define BGL_LAYER_BOUNDARY                 32UL
+#define BGL_LAYER_WAYPOINT                 34UL
+#define BGL_LAYER_GEOPOL                   35UL
+#define BGL_LAYER_3D_SCENERY               37UL
+#define BGL_LAYER_AIRPORT_NAME_OLD         39UL
+#define BGL_LAYER_VOR_INDEX_OLD            40UL
+#define BGL_LAYER_NDB_INDEX_OLD            41UL
+#define BGL_LAYER_WAYPOINT_INDEX_OLD       42UL
+#define BGL_LAYER_GUID_SCENERY_MODELS      43UL
+#define BGL_LAYER_AIRPORT_SUMMARY          44UL
+#define BGL_LAYER_EXCLUSION_RECTANGLES     46UL
+#define BGL_LAYER_TIME_ZONES               47UL
+#define BGL_LAYER_MODEL_BOX                48UL
+#define BGL_LAYER_LANDMARK_LOCATION        49UL
+#define BGL_LAYER_VOR_INDEX                50UL
+#define BGL_LAYER_NDB_INDEX                51UL
+#define BGL_LAYER_WAYPOINT_INDEX           52UL
+#define BGL_LAYER_AIRPORT_NAME             53UL
+#define BGL_LAYER_TERRAIN_VECTOR_DB        101UL
+
+#pragma pack(push, 1)
+
+typedef struct _BGLV9_FILE_HEADER
+{
+    DWORD magic;                // +0x00 0x19920201
+    DWORD headerSize;           // +0x04 0x38
+    FILETIME fileTimeUtc;       // +0x08 passed to FileTimeToSystemTime
+    DWORD unknown10;            // +0x10, 0x08051803 in apx57210.bgl
+    DWORD layerCount;           // +0x14
+    DWORD parentQmid[8];        // +0x18, zero-terminated list
+} BGLV9_FILE_HEADER;             // 0x38 bytes
+
+typedef struct _BGLV9_LAYER_DESCRIPTOR
+{
+    DWORD layerType;            // +0x00 BGL_LAYER_*
+    DWORD modeFlags;            // +0x04; bit 0x00010000 selects QMID64 entries
+    DWORD subsectionCount;      // +0x08
+    DWORD indexOffset;          // +0x0C absolute file offset
+    DWORD indexSize;            // +0x10 bytes occupied by subsection index
+} BGLV9_LAYER_DESCRIPTOR;        // 0x14 bytes
+
+typedef struct _BGLV9_QMID32_ENTRY
+{
+    DWORD packedQmid;           // +0x00
+    DWORD itemCount;            // +0x04 top-level records in payload
+    DWORD payloadOffset;        // +0x08 absolute file offset
+    DWORD payloadSize;          // +0x0C payload bytes
+} BGLV9_QMID32_ENTRY;            // 0x10 bytes
+
+typedef struct _BGLV9_QMID64_ENTRY
+{
+    ULONGLONG packedQmid;       // +0x00
+    DWORD itemCount;            // +0x08 top-level records in payload
+    DWORD payloadOffset;        // +0x0C absolute file offset
+    DWORD payloadSize;          // +0x10 payload bytes
+} BGLV9_QMID64_ENTRY;            // 0x14 bytes
+
+#pragma pack(pop)
 
 
 
@@ -1444,5 +1526,3 @@ typedef struct tag_center_freq_t
 // after the above an array of char which contains a descriptive
 // name for center follows - length of bytes to transfer is obtained
 // by: center_freq_t.nLen - sizeof(center_freq_t)
-
-

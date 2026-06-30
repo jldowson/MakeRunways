@@ -16,9 +16,13 @@
 
 #include "resource.h"
 #include "NewAFD.h"
+#include "BGLv9.h"
 
-int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpszCmdLine,
-      int cmdShow);
+int WINAPI WinMain(
+	_In_ HINSTANCE hInstance,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPSTR lpszCmdLine,
+	_In_ int cmdShow);
 
 /******************************************************************************
          Structs
@@ -126,8 +130,8 @@ typedef struct
 } OBJECT;
 
 #define LOC_AP		0x10001
-#define LOC_RWY	0x10002
-#define LOC_NAV	0x10004
+#define LOC_RWY		0x10002
+#define LOC_NAV		0x10004
 #define LOC_SET 	0x10005
 #define LOC_ICAO	0x10006
 #define LOC_FREQ	0x20001
@@ -274,6 +278,7 @@ typedef struct _rwylist
 	char *pAirportName;
 	char *pPathName;
 	char *pSceneryName;
+	char chICAOFull[9];	// MSFS2024 full airport ident, 3-8 chars + terminator. Text outputs only.
 } RWYLIST;
 
 typedef struct
@@ -294,7 +299,7 @@ typedef struct
 } RWY;
 
 typedef struct
-{	char  chICAO[4];		// 0
+{	char  chICAO[9];		// MSFS2024 ident 3–8 chars + zero
 	float fLat;				// 4
 	float fLong;			// 8
 	float fAlt;				// 12
@@ -305,7 +310,6 @@ typedef struct
 	BYTE  bFlags;			// 25
 	BYTE  bSpare;			// 26
 	BYTE  fDelete;			// 27
-	// 28
 } HELI;
 
 #pragma pack(pop)
@@ -322,6 +326,8 @@ extern RWYLIST *pR, *pRlast;
 extern char chLine[];
 extern void DecodeRwy(unsigned long n, unsigned long c, char *pch, __int32 offs, __int32 size);
 extern void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD size);
+extern void ReportGlobalNvxIlsV9Index(void);
+extern void FreeGlobalNvxIlsV9Index(void);
 extern void WritePosition(LOCATION *ploc, BOOL fWithAlt);
 extern void ToAngle(ANGLE *p, long i, unsigned long f, short type);
 extern void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr);

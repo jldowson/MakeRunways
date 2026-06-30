@@ -1,15 +1,60 @@
-/* NewBGLs.c
+/******************************************************************************* 
+NewBGLs.c
 *******************************************************************************/
 
 #include "MakeRwys.h"
+#include <ctype.h>
 
 extern char chRwyT[6];
 extern char szParkNames[12][5];
 extern char *pszParkType[];
 extern char szCurrentFilePath[MAX_PATH];
-__int32 nOffsetBase = 0;
 __int64 *pLastSetGateList = 0;
-__int32 fDeletionsPass = 0, nMinRunwayLen = 1500;
+__int32 fDeletionsPass = 0, nMinRunwayLen = 0; //1500
+BYTE *pOffsetBase = NULL;
+
+static WORD ReadBGLWordLE(const BYTE *p)
+{
+    WORD value;
+
+    memcpy(&value, p, sizeof(value));
+    return value;
+}
+
+static DWORD ReadBGLDwordLE(const BYTE *p)
+{
+    DWORD value;
+
+    memcpy(&value, p, sizeof(value));
+    return value;
+}
+
+static BOOL IsValidBGLFileRange(DWORD offset, DWORD length, DWORD fileSize)
+{
+    return (offset <= fileSize) && (length <= (fileSize - offset));
+}
+
+static BOOL IsMSFS2024BGLV9(const NBGLHDR *ph, DWORD fileSize)
+{
+    const BGLV9_FILE_HEADER *header =
+        (const BGLV9_FILE_HEADER *)ph;
+
+    if (!ph || fileSize < sizeof(BGLV9_FILE_HEADER))
+        return FALSE;
+
+    return
+        header->magic == BGLV9_MAGIC &&
+        header->headerSize == sizeof(BGLV9_FILE_HEADER);
+}
+
+static __int32 FileOffset32(const void *p)
+{
+	if (!pOffsetBase || !p)
+		return 0;
+
+	return (__int32)((const BYTE *)p - pOffsetBase);
+}
+
 
 BOOL fIncludeWater = FALSE, fMarkJetways = FALSE, fDebugThisEntry = FALSE;;
 BOOL fNoDrawHoldConvert = TRUE; // ### 4900
@@ -27,7 +72,7 @@ char *pszGateType[] =
 				{	"?", "GA Ramp", "GA Ramp Small", "GA Ramp Medium", "GA Ramp Large",
 					"Cargo Ramp", "Mil Cargo Ramp", "Mil Combat Ramp",
 					"Small Gate", "Medium Gate", "Heavy Gate", "GA Dock",
-					"Fuel", "Vehicles", "?", "?" };
+					"Fuel", "Vehicles", "GA Ramp Extra", "Gate Extra" };
 				
 
 // runway surfaces
@@ -57,7 +102,7 @@ const char *szNRwySurf[] =
 	"Sand",		// 21
 	"Shale",	// 22
 	"Tarmac",	// 23
-	"Concrete", // 24 ###added 230719 (fiddle?)
+	"Unknown24", // 24 fallback bucket for unmapped/unknown surface
 };
 
 char *pszComms[] = {
@@ -69,6 +114,79 @@ char *pszComms[] = {
 char chOldSurf[25] = {
 	2, 4, 10, 4, 3, 4, 4, 1, 8, 8, 2, 2,
 	1, 9, 5, 6, 7, 3, 11, 3, 12, 5, 5, 3, 0 }; // 11, 12 as 0 old, but okay for XML
+
+/******************************************************************************
+        MSFS2024 runway surface mapping
+******************************************************************************/
+
+static WORD GetMSFS2024RunwaySurfaceLegacyIndex(const char *pszSurfaceName)
+{
+	__int32 x;
+
+	if (!pszSurfaceName || !pszSurfaceName[0])
+		return 24;
+
+	// First keep compatibility with existing legacy MakeRunways names.
+	for (x = 0; x < 25; x++)
+	{
+		if (_stricmp(szNRwySurf[x], pszSurfaceName) == 0)
+			return (WORD)x;
+	}
+
+	/*
+		MSFS2024 SDK surface aliases.
+
+		Important note:
+		The MSFS2024 Material Inspector shows BITUMINOUS and material name
+		Runway_Bituminous. Some SDK/docs/community references show BITUMINUS.
+		We accept BITUMINUS as compatibility alias, but use Bituminous /
+		BITUMINOUS as the canonical readable form.
+	*/
+
+	if (_stricmp(pszSurfaceName, "UNKNOWN") == 0) return 24;
+
+	if (_stricmp(pszSurfaceName, "CONCRETE") == 0) return 0;
+	if (_stricmp(pszSurfaceName, "CEMENT") == 0) return 0;
+
+	if (_stricmp(pszSurfaceName, "GRASS") == 0) return 1;
+	if (_stricmp(pszSurfaceName, "GRASS_BUMPY") == 0) return 1;
+	if (_stricmp(pszSurfaceName, "SHORT_GRASS") == 0) return 1;
+	if (_stricmp(pszSurfaceName, "LONG_GRASS") == 0) return 1;
+	if (_stricmp(pszSurfaceName, "HARD_TURF") == 0) return 1;
+	if (_stricmp(pszSurfaceName, "TURF") == 0) return 1;
+
+	if (_stricmp(pszSurfaceName, "WATER") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "WATER_FSX") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "OCEAN") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "POND") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "LAKE") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "RIVER") == 0) return 2;
+	if (_stricmp(pszSurfaceName, "WASTE_WATER") == 0) return 2;
+
+	if (_stricmp(pszSurfaceName, "ASPHALT") == 0) return 4;
+	if (_stricmp(pszSurfaceName, "CLAY") == 0) return 7;
+	if (_stricmp(pszSurfaceName, "SNOW") == 0) return 8;
+	if (_stricmp(pszSurfaceName, "ICE") == 0) return 9;
+	if (_stricmp(pszSurfaceName, "DIRT") == 0) return 12;
+	if (_stricmp(pszSurfaceName, "CORAL") == 0) return 13;
+	if (_stricmp(pszSurfaceName, "GRAVEL") == 0) return 14;
+	if (_stricmp(pszSurfaceName, "OIL_TREATED") == 0) return 15;
+	if (_stricmp(pszSurfaceName, "STEEL_MATS") == 0) return 16;
+	if (_stricmp(pszSurfaceName, "STEEL") == 0) return 16;
+
+	if (_stricmp(pszSurfaceName, "BITUMINOUS") == 0) return 17;
+	if (_stricmp(pszSurfaceName, "BITUMINUS") == 0) return 17;
+
+	if (_stricmp(pszSurfaceName, "BRICK") == 0) return 18;
+	if (_stricmp(pszSurfaceName, "MACADAM") == 0) return 19;
+	if (_stricmp(pszSurfaceName, "PLANKS") == 0) return 20;
+	if (_stricmp(pszSurfaceName, "SAND") == 0) return 21;
+	if (_stricmp(pszSurfaceName, "SHALE") == 0) return 22;
+	if (_stricmp(pszSurfaceName, "TARMAC") == 0) return 23;
+
+	return 24;
+}
+
 
 /******************************************************************************
          Assorted conversions
@@ -138,7 +256,7 @@ __int32 hcompare(const void *arg1, const void *arg2)
 {	HELI *h1 = (HELI *) arg1;
 	HELI *h2 = (HELI *) arg2;
 
-	return _strnicmp(h1->chICAO, h2->chICAO, 4);
+	return _stricmp(h1->chICAO, h2->chICAO);
 }
 
 void MakeHelipadsFile(void)
@@ -153,7 +271,7 @@ void MakeHelipadsFile(void)
 
 		while (i < nHelipadCtr)
 		{	if (helipads[i].fDelete == 0)
-				fprintf(phf, "%.4s,%.6f,%.6f,%.0f,%.1f,%d,%d,%d,%d\n",
+				fprintf(phf, "%s,%.6f,%.6f,%.0f,%.1f,%d,%d,%d,%d\n",
 					helipads[i].chICAO, helipads[i].fLat, helipads[i].fLong,
 					helipads[i].fAlt, helipads[i].fHeading,
 					helipads[i].sLen, helipads[i].sWidth,
@@ -168,7 +286,7 @@ void MakeHelipadsFile(void)
 void DeleteHelipads(char *pchICAO)
 {	__int32 i = 0;
 	while (i < nHelipadCtr)
-	{	if (strncmp(helipads[i].chICAO, pchICAO, 4) == 0)
+	{	if (_stricmp(helipads[i].chICAO, pchICAO) == 0)
 			helipads[i].fDelete = 255;
 		i++;
 	}
@@ -179,13 +297,18 @@ void DeleteHelipads(char *pchICAO)
 ******************************************************************************/
 
 void DoHelipadOnly(helipad_t* ph, char *pszICAO)
-{	static char *pszFlags[5] = { "", "H", "Square", "Circle", "Medical" };
-	static char szPrevICAO[5];
+{	static char *pszFlags[5] = { "NONE", "H", "SQUARE", "CIRCLE", "MEDICAL" };
+	static char szPrevICAO[9] = "";
+	char szICAOText[9];
 	char chWork[64];
 	double dLat, dLon;
 	HELI *phs = &helipads[nHelipadCtr++];
+
+	memset(szICAOText, 0, sizeof(szICAOText));
+	strncpy_s(szICAOText, sizeof(szICAOText), pszICAO ? pszICAO : "", _TRUNCATE);
 		
-	*((DWORD *) (&phs->chICAO[0])) = *((DWORD *) pszICAO);
+	memset(phs->chICAO, 0, sizeof(phs->chICAO));
+	strncpy_s(phs->chICAO, sizeof(phs->chICAO), szICAOText, _TRUNCATE);
 	phs->bFlags = ph->bFlags;
 	phs->bSurface = ph->bSurface;
 	phs->fAlt = ((float) ph->nAlt)*3.28084F/1000;
@@ -197,19 +320,89 @@ void DoHelipadOnly(helipad_t* ph, char *pszICAO)
 	phs->fDelete = 0;
 	sprintf(chWork, "UNKNOWN %d", ph->bSurface);			
 	
-	if (strncmp(pszICAO, szPrevICAO, 4) != 0)
+	if (_stricmp(szICAOText, szPrevICAO) != 0)
 		fprintf(fpAFDS, "\n");
-	strncpy(szPrevICAO, pszICAO, 5);
-	fprintf(fpAFDS, "          HELIPAD at %s: %s %s %s",
-		pszICAO, pszFlags[ph->bFlags & 0x0f],
-		ph->bFlags & 0x10 ? "transparent" : "",
-		ph->bFlags & 0x20 ? "closed" : "");
+	strcpy_s(szPrevICAO, sizeof(szPrevICAO), szICAOText);
+	{
+		BYTE bHelipadType = (BYTE)(ph->bFlags & 0x0f);
+		const char *pszHelipadType = (bHelipadType < 5) ? pszFlags[bHelipadType] : "UNKNOWN";
+
+		fprintf(fpAFDS, "          HELIPAD at %s: %s %s %s",
+			szICAOText, pszHelipadType,
+			ph->bFlags & 0x10 ? "transparent" : "",
+			ph->bFlags & 0x20 ? "closed" : "");
+	}
 
 	fprintf(fpAFDS, "\n              Surface=%s, Lat=%.6f, Lon=%.6f, Alt=%.0fft",
 		ph->bSurface > 24 ? chWork : szNRwySurf[ph->bSurface],
 		dLat, dLon, (double) phs->fAlt);
 	fprintf(fpAFDS, "\n              Length=%dft, Width=%dft, Heading=%.1fT\n\n",
 		phs->sLen, phs->sWidth, (double) ph->fHeading);
+}
+
+/******************************************************************************
+        DoHelipadFromMSFSTaxiPark
+******************************************************************************/
+
+void DoHelipadFromMSFSTaxiPark(NGATE4 *pg4, char *pszICAO, float fAirportAltFt)
+{
+	static char szPrevICAO[9] = "";
+	char szICAOText[9];
+	double dLat, dLon;
+	HELI *phs;
+
+	if (!pg4 || !pszICAO || !pszICAO[0])
+		return;
+
+	memset(szICAOText, 0, sizeof(szICAOText));
+	strncpy_s(szICAOText, sizeof(szICAOText), pszICAO, _TRUNCATE);
+
+	if (nHelipadCtr >= 10000)
+	{
+		fprintf(fpAFDS, "          WARNING: helipads.csv limit reached, MSFS2024 helicopter stand ignored for %s\n", pszICAO);
+		return;
+	}
+
+	phs = &helipads[nHelipadCtr++];
+	memset(phs, 0, sizeof(HELI));
+
+	/*
+		HELI is still a legacy internal structure with 4-char ICAO.
+		For this first patch we keep the legacy output format unchanged.
+	*/
+	memset(phs->chICAO, 0, sizeof(phs->chICAO));
+	strncpy_s(phs->chICAO, sizeof(phs->chICAO), szICAOText, _TRUNCATE);
+
+	phs->bFlags = HELITYPE_H;
+	phs->bSurface = 0;	// Concrete fallback
+	phs->fAlt = fAirportAltFt;
+	phs->fHeading = pg4->fHeading;
+
+	/*
+		TaxiwayParking stores radius in meters.
+		helipads.csv expects length/width in feet.
+		Use diameter = radius * 2.
+	*/
+	phs->sLen = (unsigned short)(((pg4->fRadius * 2.0F) * 3.28084F) + 0.5F);
+	phs->sWidth = phs->sLen;
+
+	fslat2lat(pg4->nLat, &phs->fLat, &dLat);
+	fslon2lon(pg4->nLon, &phs->fLong, &dLon);
+
+	phs->fDelete = 0;
+
+	if (_stricmp(szICAOText, szPrevICAO) != 0)
+		fprintf(fpAFDS, "\n");
+
+	strcpy_s(szPrevICAO, sizeof(szPrevICAO), szICAOText);
+
+	fprintf(fpAFDS,
+		"          MSFS2024 HELISTAND from TaxiwayParking at %s: radius=%.1fm, heading=%.1fT\n",
+		szICAOText, (double)pg4->fRadius, (double)pg4->fHeading);
+
+	fprintf(fpAFDS,
+		"              Lat=%.6f, Lon=%.6f, Alt=%.0fft, Length=%dft, Width=%dft\n\n",
+		dLat, dLon, (double)phs->fAlt, phs->sLen, phs->sWidth);
 }
 
 /******************************************************************************
@@ -235,6 +428,148 @@ void PrintRWSLIST(RWYLIST *pL)
 				(pL->fILSflags & 0x10) ? " DME" : "",
 				(pL->fILSflags & 0x04) ? " BC" : "");
 	}
+}
+
+/******************************************************************************
+         IsBGLSourcePrefix
+******************************************************************************/
+
+static BOOL IsBGLSourcePrefix(const char *path, const char *prefix)
+{
+	const char *name;
+	const char *backslash;
+	const char *slash;
+
+	if (!path || !prefix)
+		return FALSE;
+
+	name = path;
+	backslash = strrchr(path, '\\');
+	slash = strrchr(path, '/');
+
+	if (backslash && (!slash || (backslash > slash)))
+		name = backslash + 1;
+	else if (slash)
+		name = slash + 1;
+
+	return (_strnicmp(name, prefix, 3) == 0);
+}
+
+/******************************************************************************
+         MergeRunwayNavigation
+******************************************************************************/
+
+static void MergeRunwayNavigation(RWYLIST *destination, const RWYLIST *source)
+{
+	if (!destination || !source)
+		return;
+
+	/*
+	    Preserve the ILS identifier even when the source record has not
+	    resolved the corresponding frequency yet.
+	*/
+	if (source->r.chILSid[0])
+	{
+		memcpy(
+			destination->r.chILSid,
+			source->r.chILSid,
+			sizeof(destination->r.chILSid));
+	}
+
+	/*
+	    A non-empty frequency identifies a fully resolved ILS record.
+	    Copy all associated fields as one coherent group.
+	*/
+	if (source->r.chILS[0])
+	{
+		memcpy(
+			destination->r.chILS,
+			source->r.chILS,
+			sizeof(destination->r.chILS));
+
+		memcpy(
+			destination->r.chILSHdg,
+			source->r.chILSHdg,
+			sizeof(destination->r.chILSHdg));
+
+		destination->r.fILSslope = source->r.fILSslope;
+
+		memcpy(
+			destination->r.chNameILS,
+			source->r.chNameILS,
+			sizeof(destination->r.chNameILS));
+
+		destination->fILSflags = source->fILSflags;
+	}
+}
+
+/******************************************************************************
+         GetRunwayICAOKey
+******************************************************************************/
+
+static void GetRunwayICAOKey(const RWYLIST *entry, char key[9])
+{
+	int i;
+
+	memset(key, 0, 9);
+
+	if (!entry)
+		return;
+
+	if (entry->chICAOFull[0])
+	{
+		strncpy_s(key, 9, entry->chICAOFull, _TRUNCATE);
+		return;
+	}
+
+	memcpy(key, entry->r.chICAO, 4);
+	key[4] = 0;
+
+	for (i = 3; i >= 0; i--)
+	{
+		if (key[i] != ' ')
+			break;
+
+		key[i] = 0;
+	}
+}
+
+/******************************************************************************
+         CompareRunwayListKey
+******************************************************************************/
+
+static __int32 CompareRunwayListKey(
+	const RWYLIST *left,
+	const RWYLIST *right,
+	__int32 legacyLength)
+{
+	char leftICAO[9];
+	char rightICAO[9];
+	__int32 result;
+
+	GetRunwayICAOKey(left, leftICAO);
+	GetRunwayICAOKey(right, rightICAO);
+
+	result = _stricmp(leftICAO, rightICAO);
+
+	if (result != 0)
+		return result;
+
+	/*
+	    A four-byte comparison is used when deleting or locating all
+	    entries belonging to an airport.
+	*/
+	if (legacyLength <= 4)
+		return 0;
+
+	/*
+	    The remaining four bytes of the legacy eight-byte key contain
+	    the runway, gate or taxiway identifier.
+	*/
+	return memcmp(
+		left->r.chRwy,
+		right->r.chRwy,
+		legacyLength - 4);
 }
 
 /******************************************************************************
@@ -273,29 +608,100 @@ void ProcessRunwayList(RWYLIST *pL, BOOL fAdd, BOOL fNoCtr)
 		if (fAdd <= 0) pRlast = pR; // deletes need search from start
 										
 		while (pRlast) 
-		{	__int32 comp = memcmp(&pRlast->r, &pL->r, nCompLen);
+		{	__int32 comp = CompareRunwayListKey(pRlast, pL, nCompLen);
 			if (fUserAbort) return;
 
-			if (fNewAirport && (memcmp(&pRlast->r, &pL->r, 4) == 0))
+			if (fNewAirport && (CompareRunwayListKey(pRlast, pL, 4) == 0))
 			{	ulTotalAPs--;
 				fNewAirport = FALSE;	
 			}
 
 			if (comp == 0) // Duplicate (or found one to delete)
-			{	if (fAdd > 0)
-				{	// Copy in new data and then discard alloc!
-					// NB Except for gates and taxiways, when keep first ones if exist
-					// But keep ILS/ATIS if the new one hasn't got it or it is < 118.00!
-					if (pL->r.chILS[1] == 0)
-					{	memcpy(pL->r.chILS, pRlast->r.chILS, sizeof(pL->r.chILS));
-						memcpy(pL->r.chILSHdg, pRlast->r.chILSHdg, sizeof(pL->r.chILSHdg));
-						pL->fILSflags = pRlast->fILSflags;
+			{
+				if (fAdd > 0)
+				{
+					BOOL keepExistingAPX =
+						fMSFS &&
+						IsBGLSourcePrefix(pRlast->pPathName, "apx") &&
+						(IsBGLSourcePrefix(pL->pPathName, "nax") ||
+						IsBGLSourcePrefix(pL->pPathName, "nvx"));
+
+					/*
+						APX is the canonical airport/runway source.
+
+						A later NAX/NVX entry may enrich the APX entry with
+						navigation data, but must not replace its geometry,
+						altitude, source pathname or scenery title.
+					*/
+					if (keepExistingAPX)
+					{
+						MergeRunwayNavigation(pRlast, pL);
+
+						if ((pRlast->Atis < 0x1800) &&
+							(pL->Atis >= 0x1800))
+						{
+							pRlast->Atis = pL->Atis;
+						}
+
+						if (!pRlast->pCountryName)
+							pRlast->pCountryName = pL->pCountryName;
+
+						if (!pRlast->pStateName)
+							pRlast->pStateName = pL->pStateName;
+
+						if (!pRlast->pCityName)
+							pRlast->pCityName = pL->pCityName;
+
+						if (!pRlast->pAirportName)
+							pRlast->pAirportName = pL->pAirportName;
+
+						if (!pRlast->pGateList)
+						{
+							pRlast->pGateList = pL->pGateList;
+							pL->pGateList = NULL;
+						}
+						else if (pL->pGateList)
+						{
+							free(pL->pGateList);
+							pL->pGateList = NULL;
+						}
+
+						if (!pRlast->pTaxiwayList)
+						{
+							pRlast->pTaxiwayList = pL->pTaxiwayList;
+							pL->pTaxiwayList = NULL;
+						}
+						else if (pL->pTaxiwayList)
+						{
+							free(pL->pTaxiwayList);
+							pL->pTaxiwayList = NULL;
+						}
+
+						if (pRlast->fDelete && !fNoCtr)
+							ulTotalRwys++;
+
+						pRlast->fDelete = 0;
+
+						if (strncmp(pL->r.chRwy, "999", 3) == 0)
+							prwyPrevious = pRlast;
+
+						free(pL);
+						break;
 					}
+
+					/*
+						Normal precedence: the new entry replaces the previous
+						one, but must inherit complete ILS information when the
+						new source has not resolved it.
+					*/
+					if (!pL->r.chILS[0])
+						MergeRunwayNavigation(pL, pRlast);
 					
 					if (pL->Atis < 0x1800)
 						pL->Atis = pRlast->Atis;
 					
 					memcpy(&pRlast->r, &pL->r, sizeof(RWYDATA));
+					memcpy(pRlast->chICAOFull, pL->chICAOFull, sizeof(pRlast->chICAOFull));
 					
 					pRlast->fHdg = pL->fHdg;
 					pRlast->nOffThresh = pL->nOffThresh;
@@ -418,6 +824,18 @@ void AddRunway(RWYLIST *prwy)
 {	RWYLIST *pL = (RWYLIST *) malloc(sizeof(RWYLIST)), *pRes = 0;
 	if (pL)
 	{	memcpy(pL, prwy, sizeof(RWYLIST));
+
+		/*
+		    Runways, gates and taxiway entries must retain their BGL
+		    provenance so duplicate APX/NAX records can be merged
+		    according to their source.
+		*/
+		if (!pL->pPathName)
+			pL->pPathName = pPathName;
+
+		if (!pL->pSceneryName)
+			pL->pSceneryName = pSceneryName;
+
 		ProcessRunwayList(pL, TRUE, 0);
 		if (!pL->fAirport) fFS9 = 1; // Stay in >=FS9 mode		
 	}
@@ -473,6 +891,748 @@ __int32 nOffsetILS, nSizeILS;
 char chNameILS[256];
 float fILSheading, fILSslope, fRange2;
 
+/*
+    Active MSFS 2024 BGL v9 context.
+
+    The context is valid only while CheckMSFS2024BGLV9() is processing one
+    file. It allows FindILSdetails() to search layer 19 without passing the
+    v9 container layout through the legacy NSECTS/NOBJ interface.
+*/
+static const BYTE *pMSFS2024BGLV9Data = NULL;
+static DWORD nMSFS2024BGLV9FileSize = 0;
+static DWORD nMSFS2024BGLV9HeaderSize = 0;
+static DWORD nMSFS2024BGLV9LayerCount = 0;
+
+/*
+    Global MSFS 2024 NVX/NAX ILS index.
+
+    The v9 airport/APX record may reference an ILS ident whose full VOR/ILS
+    record is stored in another NAX/NVX BGL.  This index is intentionally keyed
+    first by localizer ident only; runway/ICAO association is left to later
+    patches.  To keep the first fallback safe, candidates are still filtered by
+    runway heading and, when runway coordinates are available, by proximity.
+*/
+typedef struct _GLOBAL_NVX_ILS_V9
+{
+    char chIdent[16];
+    char chName[256];
+    char chSourceFile[MAX_PATH];
+    __int32 nFreq;          /* MakeRunways convention: 10 kHz units */
+    __int32 nOffset;
+    __int32 nSize;
+    float fHeading;
+    float fSlope;
+    float fLat;
+    float fLon;
+    BYTE fFlags;
+} GLOBAL_NVX_ILS_V9;
+
+static GLOBAL_NVX_ILS_V9 *pGlobalNvxIlsV9 = NULL;
+static DWORD nGlobalNvxIlsV9Count = 0;
+static DWORD nGlobalNvxIlsV9Alloc = 0;
+static DWORD nGlobalNvxIlsV9Duplicates = 0;
+static DWORD nGlobalNvxIlsV9FilesWithIls = 0;
+static DWORD nGlobalNvxIlsV9Lookups = 0;
+static DWORD nGlobalNvxIlsV9Used = 0;
+static DWORD nGlobalNvxIlsV9Misses = 0;
+static DWORD nGlobalNvxIlsV9HeadingRejects = 0;
+static DWORD nGlobalNvxIlsV9RangeRejects = 0;
+static BOOL fMatchedGlobalNvxIlsV9 = FALSE;
+static char chMatchedGlobalNvxIlsV9Source[MAX_PATH];
+ 
+ /******************************************************************************
+         DecodeIDV9
+******************************************************************************/
+
+static void DecodeIDV9(DWORD number, char *p)
+{
+	char r, c;
+	char *p1 = p;
+	DWORD q = number >> BGLV9_VOR_IDENT_SHIFT;
+
+	for (; q > 0; q /= 38)
+	{
+		r = (char)(q % 38);
+		c = (r < 12) ? r + 46 : r + 53;
+		*p++ = c;
+	}
+
+	*p = 0;
+
+	if (!*p1)
+	{
+		*p1 = '0';
+		*++p1 = 0;
+	}
+	else
+	{
+		str_rev(p1);
+	}
+}
+
+static void CopyIdentUpper(char *pszDst, size_t cbDst, const char *pszSrc)
+{
+	size_t i, j;
+	if (!pszDst || !cbDst)
+		return;
+
+	pszDst[0] = 0;
+
+	if (!pszSrc)
+		return;
+
+	while (*pszSrc && isspace((unsigned char)*pszSrc))
+		pszSrc++;
+
+	for (i = 0, j = 0; pszSrc[i] && (j + 1) < cbDst; i++)
+	{
+		if (isspace((unsigned char)pszSrc[i]))
+			break;
+
+		pszDst[j++] = (char)toupper((unsigned char)pszSrc[i]);
+	}
+
+	pszDst[j] = 0;
+}
+
+static BOOL ExtractIlsV9Record(
+	const BYTE *record,
+	DWORD recordSize,
+	GLOBAL_NVX_ILS_V9 *pOut)
+{
+	const BGLV9_VOR_ILS_RECORD *pIls;
+	DWORD childOffset;
+	BOOL fHaveLocalizer = FALSE;
+	float fHeading = 0.0F;
+	float fSlope = 0.0F;
+
+	if (!record || !pOut || (recordSize < sizeof(BGLV9_VOR_ILS_RECORD)))
+		return FALSE;
+
+	if (ReadBGLWordLE(record) != BGLV9_RECORD_VOR_ILS)
+		return FALSE;
+
+	pIls = (const BGLV9_VOR_ILS_RECORD *)record;
+
+	if (pIls->facilityType != BGLV9_VOR_FACILITY_ILS)
+		return FALSE;
+
+	memset(pOut, 0, sizeof(*pOut));
+	DecodeIDV9(pIls->packedIdent, pOut->chIdent);
+
+	childOffset = BGLV9_VOR_ILS_FIXED_SIZE;
+
+	while ((childOffset + sizeof(BGLV9_RECORD_HEADER)) <= recordSize)
+	{
+		const BYTE *child = record + childOffset;
+		WORD childType = ReadBGLWordLE(child);
+		DWORD childSize = ReadBGLDwordLE(child + 2);
+
+		if ((childSize < sizeof(BGLV9_RECORD_HEADER)) ||
+			(childSize > (recordSize - childOffset)))
+		{
+			break;
+		}
+
+		if ((childType == BGLV9_RECORD_ILS_LOCALIZER) &&
+			(childSize >= sizeof(BGLV9_ILS_LOCALIZER_RECORD)))
+		{
+			const BGLV9_ILS_LOCALIZER_RECORD *pLocalizer =
+				(const BGLV9_ILS_LOCALIZER_RECORD *)child;
+
+			fHeading = pLocalizer->heading;
+			fHaveLocalizer = TRUE;
+		}
+		else if ((childType == BGLV9_RECORD_ILS_GLIDESLOPE) &&
+			(childSize >= sizeof(BGLV9_ILS_GLIDESLOPE_RECORD)))
+		{
+			const BGLV9_ILS_GLIDESLOPE_RECORD *pGlideslope =
+				(const BGLV9_ILS_GLIDESLOPE_RECORD *)child;
+
+			fSlope = pGlideslope->pitchDegrees;
+		}
+		else if (childType == BGLV9_RECORD_NAME)
+		{
+			StoreName(pOut->chName, (NNAM *)child);
+		}
+
+		childOffset += childSize;
+	}
+
+	if (!fHaveLocalizer)
+		return FALSE;
+
+	pOut->nFreq = (__int32)((pIls->frequencyHz + 5000) / 10000);
+	pOut->nOffset = FileOffset32(record);
+	pOut->nSize = (__int32)recordSize;
+	pOut->fHeading = fHeading;
+	pOut->fSlope = fSlope;
+	pOut->fFlags = pIls->flags;
+	fslat2lat(pIls->latitude, &pOut->fLat, 0);
+	fslon2lon(pIls->longitude, &pOut->fLon, 0);
+
+	if (szCurrentFilePath[0])
+		strncpy_s(
+			pOut->chSourceFile,
+			sizeof(pOut->chSourceFile),
+			szCurrentFilePath,
+			_TRUNCATE);
+
+	return pOut->chIdent[0] && pOut->nFreq;
+}
+
+static BOOL IsDuplicateGlobalNvxIlsV9(const GLOBAL_NVX_ILS_V9 *pIls)
+{
+	DWORD i;
+
+	if (!pIls)
+		return TRUE;
+
+	for (i = 0; i < nGlobalNvxIlsV9Count; i++)
+	{
+		GLOBAL_NVX_ILS_V9 *p = &pGlobalNvxIlsV9[i];
+
+		if ((p->nOffset == pIls->nOffset) &&
+			(!_stricmp(p->chSourceFile, pIls->chSourceFile)))
+		{
+			return TRUE;
+		}
+
+		if (!_stricmp(p->chIdent, pIls->chIdent) &&
+			(p->nFreq == pIls->nFreq) &&
+			(HdgDiff(p->fHeading, pIls->fHeading) < 0.01F) &&
+			(fabs((double)(p->fLat - pIls->fLat)) < 0.000001) &&
+			(fabs((double)(p->fLon - pIls->fLon)) < 0.000001))
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
+static BOOL AddGlobalNvxIlsV9(const GLOBAL_NVX_ILS_V9 *pIls)
+{
+	GLOBAL_NVX_ILS_V9 *pNew;
+	DWORD nNewAlloc;
+
+	if (!pIls || !pIls->chIdent[0] || !pIls->nFreq)
+		return FALSE;
+
+	if (IsDuplicateGlobalNvxIlsV9(pIls))
+	{
+		nGlobalNvxIlsV9Duplicates++;
+		return FALSE;
+	}
+
+	if (nGlobalNvxIlsV9Count >= nGlobalNvxIlsV9Alloc)
+	{
+		nNewAlloc = nGlobalNvxIlsV9Alloc + 256;
+		pNew = (GLOBAL_NVX_ILS_V9 *)realloc(
+			pGlobalNvxIlsV9,
+			nNewAlloc * sizeof(GLOBAL_NVX_ILS_V9));
+
+		if (!pNew)
+			return FALSE;
+
+		pGlobalNvxIlsV9 = pNew;
+		nGlobalNvxIlsV9Alloc = nNewAlloc;
+	}
+
+	pGlobalNvxIlsV9[nGlobalNvxIlsV9Count++] = *pIls;
+	return TRUE;
+}
+
+static void IndexGlobalNvxIlsV9Payload(
+	const BYTE *payload,
+	DWORD payloadSize,
+		DWORD expectedRecords)
+{
+	DWORD recordIndex;
+	DWORD cursor = 0;
+
+	for (recordIndex = 0; recordIndex < expectedRecords; recordIndex++)
+	{
+		const BYTE *record;
+		DWORD recordSize;
+		WORD recordType;
+
+		if ((payloadSize - cursor) < sizeof(BGLV9_RECORD_HEADER))
+			return;
+
+		record = payload + cursor;
+		recordType = ReadBGLWordLE(record);
+		recordSize = ReadBGLDwordLE(record + 2);
+
+		if ((recordSize < sizeof(BGLV9_RECORD_HEADER)) ||
+			(recordSize > (payloadSize - cursor)))
+		{
+			return;
+		}
+
+		if ((recordType == BGLV9_RECORD_VOR_ILS) &&
+			(recordSize >= sizeof(BGLV9_VOR_ILS_RECORD)))
+		{
+			GLOBAL_NVX_ILS_V9 ils;
+
+			if (ExtractIlsV9Record(record, recordSize, &ils))
+				AddGlobalNvxIlsV9(&ils);
+		}
+
+		cursor += recordSize;
+	}
+}
+
+static void BuildGlobalNvxIlsV9Index(void)
+{
+	DWORD i;
+	DWORD nCountBefore;
+
+	if (!pMSFS2024BGLV9Data ||
+		!nMSFS2024BGLV9FileSize ||
+		!nMSFS2024BGLV9LayerCount)
+	{
+		return;
+	}
+
+	nCountBefore = nGlobalNvxIlsV9Count;
+
+	for (i = 0; i < nMSFS2024BGLV9LayerCount; i++)
+	{
+		const BYTE *layer =
+			pMSFS2024BGLV9Data +
+			nMSFS2024BGLV9HeaderSize +
+			(i * (DWORD)sizeof(BGLV9_LAYER_DESCRIPTOR));
+		DWORD layerType = ReadBGLDwordLE(layer);
+		DWORD modeFlags = ReadBGLDwordLE(layer + 4);
+		DWORD subsectionCount = ReadBGLDwordLE(layer + 8);
+		DWORD indexOffset = ReadBGLDwordLE(layer + 12);
+		DWORD indexSize = ReadBGLDwordLE(layer + 16);
+		DWORD indexStride =
+			(modeFlags & BGLV9_QMID64_FLAG)
+				? (DWORD)sizeof(BGLV9_QMID64_ENTRY)
+				: (DWORD)sizeof(BGLV9_QMID32_ENTRY);
+		DWORD requiredIndexSize;
+		DWORD j;
+
+		if (layerType != BGLV9_LAYER_VOR)
+			continue;
+
+		if (subsectionCount > ((DWORD)-1 / indexStride))
+			continue;
+
+		requiredIndexSize = subsectionCount * indexStride;
+
+		if ((indexSize < requiredIndexSize) ||
+			!IsValidBGLFileRange(
+				indexOffset,
+				indexSize,
+				nMSFS2024BGLV9FileSize))
+		{
+			continue;
+		}
+
+		for (j = 0; j < subsectionCount; j++)
+		{
+			const BYTE *entry =
+				pMSFS2024BGLV9Data +
+				indexOffset +
+				(j * indexStride);
+			DWORD itemCount;
+			DWORD payloadOffset;
+			DWORD payloadSize;
+
+			if (modeFlags & BGLV9_QMID64_FLAG)
+ 			{		
+				itemCount = ReadBGLDwordLE(entry + 8);
+				payloadOffset = ReadBGLDwordLE(entry + 12);
+				payloadSize = ReadBGLDwordLE(entry + 16);
+			}
+			else
+			{
+				itemCount = ReadBGLDwordLE(entry + 4);
+				payloadOffset = ReadBGLDwordLE(entry + 8);
+				payloadSize = ReadBGLDwordLE(entry + 12);
+ 			}
+
+			if (!itemCount ||
+				!IsValidBGLFileRange(
+					payloadOffset,
+					payloadSize,
+					nMSFS2024BGLV9FileSize))
+ 			{
+ 				continue;
+ 			}			
+
+
+			IndexGlobalNvxIlsV9Payload(
+				pMSFS2024BGLV9Data + payloadOffset,
+				payloadSize,
+				itemCount);
+		}
+	}
+
+	if (nGlobalNvxIlsV9Count > nCountBefore)
+		nGlobalNvxIlsV9FilesWithIls++;
+}
+
+
+
+static float GlobalNvxIlsV9Range2(const GLOBAL_NVX_ILS_V9 *pIls, const RWYLIST *prwy)
+{
+	float fLatDiff;
+	float fLonDiff;
+
+	if (!pIls || !prwy)
+		return 999.0F;
+	fLatDiff = pIls->fLat - prwy->fLat;
+	fLonDiff = (float)((pIls->fLon - prwy->fLong) *
+		cos((pIls->fLat + prwy->fLat) * PI / 360.0));
+
+	return (fLatDiff * fLatDiff) + (fLonDiff * fLonDiff);
+}
+
+static __int32 MatchGlobalNvxIlsV9(char *psz, RWYLIST *prwy)
+{
+	char chIdent[16];
+	const GLOBAL_NVX_ILS_V9 *pBest = NULL;
+	float fBestScore = 999999.0F;
+	DWORD i;
+	BOOL fHaveRunwayPosition;
+
+	fMatchedGlobalNvxIlsV9 = FALSE;
+	chMatchedGlobalNvxIlsV9Source[0] = 0;
+	CopyIdentUpper(chIdent, sizeof(chIdent), psz);
+
+	if (!chIdent[0])
+		return 0;
+
+	nGlobalNvxIlsV9Lookups++;
+
+	if (!nGlobalNvxIlsV9Count)
+	{
+		nGlobalNvxIlsV9Misses++;
+ 		return 0;
+	}
+
+	fHaveRunwayPosition =
+		prwy &&
+		((fabs((double)prwy->fLat) > 0.000001) ||
+		 (fabs((double)prwy->fLong) > 0.000001));
+
+	for (i = 0; i < nGlobalNvxIlsV9Count; i++)
+	{
+		const GLOBAL_NVX_ILS_V9 *pIls = &pGlobalNvxIlsV9[i];
+		float fHeadingDiff;
+		float fRange2 = 0.0F;
+		float fScore;
+
+		if (_stricmp(pIls->chIdent, chIdent) != 0)
+			continue;
+
+		fHeadingDiff = prwy ? HdgDiff(pIls->fHeading, prwy->fHdg) : 0.0F;
+		if (prwy && (fHeadingDiff >= 40.0F))
+		{
+			nGlobalNvxIlsV9HeadingRejects++;
+			continue;
+		}
+
+		if (fHaveRunwayPosition)
+		{
+			fRange2 = GlobalNvxIlsV9Range2(pIls, prwy);
+
+			/* Same 3 NM safety radius used by the legacy range check. */
+			if (fRange2 >= 0.0025F)
+			{
+				nGlobalNvxIlsV9RangeRejects++;
+				continue;
+			}
+		}
+
+		fScore = (fRange2 * 100000.0F) + fHeadingDiff;
+
+		if (!pBest || (fScore < fBestScore))
+		{
+			pBest = pIls;
+			fBestScore = fScore;
+		}
+	}
+
+	if (!pBest)
+	{
+		nGlobalNvxIlsV9Misses++;
+		return 0;
+	}
+
+	fILSheading = pBest->fHeading;
+	fILSslope = pBest->fSlope;
+	fMatchedILS = TRUE;
+	fFoundSome = TRUE;
+	nOffsetILS = pBest->nOffset;
+	nSizeILS = pBest->nSize;
+	chNameILS[0] = 0;
+	strncpy_s(chNameILS, sizeof(chNameILS), pBest->chName, _TRUNCATE);
+
+	if (prwy)
+		prwy->fILSflags = pBest->fFlags;
+
+	fMatchedGlobalNvxIlsV9 = TRUE;
+	nGlobalNvxIlsV9Used++;
+	strncpy_s(
+		chMatchedGlobalNvxIlsV9Source,
+		sizeof(chMatchedGlobalNvxIlsV9Source),
+		pBest->chSourceFile,
+		_TRUNCATE);
+
+	return pBest->nFreq;
+}
+
+/******************************************************************************
+         ReportGlobalNvxIlsV9Index
+******************************************************************************/
+
+void ReportGlobalNvxIlsV9Index(void)
+{
+	if (!fpAFDS)
+		return;
+
+	if (!nGlobalNvxIlsV9Count &&
+		!nGlobalNvxIlsV9Duplicates &&
+		!nGlobalNvxIlsV9Lookups)
+	{
+		return;
+	}
+
+	fprintf(fpAFDS,
+		"\nMSFS2024 global NVX/NAX ILS index:\n"
+		"  files with ILS records      = %lu\n"
+		"  records indexed             = %lu\n"
+		"  duplicate records skipped   = %lu\n"
+		"  fallback lookups            = %lu\n"
+		"  fallback matches used       = %lu\n"
+		"  fallback misses             = %lu\n"
+		"  rejected by heading safety  = %lu\n"
+		"  rejected by range safety    = %lu\n",
+		(unsigned long)nGlobalNvxIlsV9FilesWithIls,
+		(unsigned long)nGlobalNvxIlsV9Count,
+		(unsigned long)nGlobalNvxIlsV9Duplicates,
+		(unsigned long)nGlobalNvxIlsV9Lookups,
+		(unsigned long)nGlobalNvxIlsV9Used,
+		(unsigned long)nGlobalNvxIlsV9Misses,
+		(unsigned long)nGlobalNvxIlsV9HeadingRejects,
+		(unsigned long)nGlobalNvxIlsV9RangeRejects);
+}
+
+void FreeGlobalNvxIlsV9Index(void)
+{
+	if (pGlobalNvxIlsV9)
+	{
+		free(pGlobalNvxIlsV9);
+		pGlobalNvxIlsV9 = NULL;
+	}
+
+	nGlobalNvxIlsV9Count = 0;
+	nGlobalNvxIlsV9Alloc = 0;
+}
+
+/******************************************************************************
+         NewILSsV9
+******************************************************************************/
+
+static __int32 NewILSsV9(
+	const BYTE *payload,
+	DWORD payloadSize,
+	DWORD expectedRecords,
+	char *psz,
+	RWYLIST *prwy)
+{
+	DWORD recordIndex;
+	DWORD cursor = 0;
+	char chSearchIdent[16];
+
+	CopyIdentUpper(chSearchIdent, sizeof(chSearchIdent), psz);
+
+	for (recordIndex = 0; recordIndex < expectedRecords; recordIndex++)
+	{
+		const BYTE *record;
+		DWORD recordSize;
+		WORD recordType;
+
+		if ((payloadSize - cursor) < sizeof(BGLV9_RECORD_HEADER))
+			return 0;
+
+		record = payload + cursor;
+		recordType = ReadBGLWordLE(record);
+		recordSize = ReadBGLDwordLE(record + 2);
+
+		if ((recordSize < sizeof(BGLV9_RECORD_HEADER)) ||
+			(recordSize > (payloadSize - cursor)))
+		{
+			return 0;
+		}
+
+		if ((recordType == BGLV9_RECORD_VOR_ILS) &&
+			(recordSize >= sizeof(BGLV9_VOR_ILS_RECORD)))
+		{
+			GLOBAL_NVX_ILS_V9 ils;
+
+			if (!ExtractIlsV9Record(record, recordSize, &ils))
+			{
+				cursor += recordSize;
+				continue;
+			}
+
+			if (_stricmp(ils.chIdent, chSearchIdent) != 0)
+			{
+				cursor += recordSize;
+				continue;
+			}
+
+			if (prwy && (HdgDiff(ils.fHeading, prwy->fHdg) >= 40.0F))
+			{
+				cursor += recordSize;
+				continue;
+			}
+
+			fILSheading = ils.fHeading;
+			fILSslope = ils.fSlope;
+			fMatchedILS = TRUE;
+			fFoundSome = TRUE;
+			nOffsetILS = ils.nOffset;
+			nSizeILS = ils.nSize;
+			chNameILS[0] = 0;
+			strncpy_s(chNameILS, sizeof(chNameILS), ils.chName, _TRUNCATE);
+
+			if (prwy)
+			{
+				prwy->fILSflags = ils.fFlags;
+			}
+
+			return ils.nFreq;
+		}
+
+		cursor += recordSize;
+	}
+
+	return 0;
+}
+
+/******************************************************************************
+         MatchILSV9
+******************************************************************************/
+
+static __int32 MatchILSV9(char *psz, RWYLIST *prwy)
+{
+	DWORD i;
+
+	fMatchedILS = FALSE;
+	chNameILS[0] = 0;
+
+	if (!pMSFS2024BGLV9Data ||
+		!nMSFS2024BGLV9FileSize ||
+		!nMSFS2024BGLV9LayerCount ||
+		!psz ||
+		!psz[0])
+	{
+		return 0;
+	}
+
+	for (i = 0; i < nMSFS2024BGLV9LayerCount; i++)
+	{
+		const BYTE *layer =
+			pMSFS2024BGLV9Data +
+			nMSFS2024BGLV9HeaderSize +
+			(i * (DWORD)sizeof(BGLV9_LAYER_DESCRIPTOR));
+		DWORD layerType = ReadBGLDwordLE(layer);
+		DWORD modeFlags = ReadBGLDwordLE(layer + 4);
+		DWORD subsectionCount = ReadBGLDwordLE(layer + 8);
+		DWORD indexOffset = ReadBGLDwordLE(layer + 12);
+		DWORD indexSize = ReadBGLDwordLE(layer + 16);
+		DWORD indexStride =
+			(modeFlags & BGLV9_QMID64_FLAG)
+				? (DWORD)sizeof(BGLV9_QMID64_ENTRY)
+				: (DWORD)sizeof(BGLV9_QMID32_ENTRY);
+		DWORD requiredIndexSize;
+		DWORD j;
+
+		if (fUserAbort)
+			return 0;
+
+		if (layerType != BGLV9_LAYER_VOR)
+			continue;
+
+		if (subsectionCount > ((DWORD)-1 / indexStride))
+			continue;
+
+		requiredIndexSize = subsectionCount * indexStride;
+
+		if ((indexSize < requiredIndexSize) ||
+			!IsValidBGLFileRange(
+				indexOffset,
+				indexSize,
+				nMSFS2024BGLV9FileSize))
+		{
+			continue;
+		}
+
+		for (j = 0; j < subsectionCount; j++)
+		{
+			const BYTE *entry =
+				pMSFS2024BGLV9Data +
+				indexOffset +
+				(j * indexStride);
+			DWORD itemCount;
+			DWORD payloadOffset;
+			DWORD payloadSize;
+			__int32 nFreq;
+
+			if (fUserAbort)
+				return 0;
+
+			if (modeFlags & BGLV9_QMID64_FLAG)
+			{
+				itemCount = ReadBGLDwordLE(entry + 8);
+				payloadOffset = ReadBGLDwordLE(entry + 12);
+				payloadSize = ReadBGLDwordLE(entry + 16);
+			}
+			else
+			{
+				itemCount = ReadBGLDwordLE(entry + 4);
+				payloadOffset = ReadBGLDwordLE(entry + 8);
+				payloadSize = ReadBGLDwordLE(entry + 12);
+			}
+
+			if (!itemCount ||
+				!IsValidBGLFileRange(
+					payloadOffset,
+					payloadSize,
+					nMSFS2024BGLV9FileSize))
+			{
+				continue;
+			}
+
+			nFreq = NewILSsV9(
+				pMSFS2024BGLV9Data + payloadOffset,
+				payloadSize,
+				itemCount,
+				psz,
+				prwy);
+
+			if (nFreq)
+				return nFreq;
+		}
+	}
+
+	if (prwy)
+		prwy->fILSflags = 0;
+
+	return 0;
+}
+
+/******************************************************************************
+        NewILSs
+ ******************************************************************************/
+
 // Mode 0 = Match ID & Dir
 //      1 = Match Name & Dir & Range
 //      -1 = List all by Range
@@ -499,13 +1659,13 @@ __int32 NewILSs(NILS *pi, DWORD size, char *psz, RWYLIST *prwy, __int32 nMode)
 			fILSslope = (pi->loc.nRec0014 == 0x0015) ? ((NILSGS *) &pi->loc.nRec0014)->fGSpitch :
 						*((WORD *) ((BYTE *) &pi->loc.fWidth + 4)) == 0x0015 ?
 							((NILSGS *) ((BYTE *) &pi->loc.fWidth + 4))->fGSpitch : 0.00F;
-			nOffsetILS = (__int32) &pi->wId - nOffsetBase;
+			nOffsetILS = FileOffset32(&pi->wId);
 			nSizeILS = pi->nLen;
 			
 			DecodeID(pi->nId, chId, 1);
 			fMatchID = _stricmp(chId, psz) == 0;
 
-			if (fMatchID && (HdgDiff(pi->loc.fHeading, prwy->fHdg) < 40.0))
+			if (prwy && fMatchID && (HdgDiff(pi->loc.fHeading, prwy->fHdg) < 40.0))
 			{	prwy->fILSflags = pi->bFlags;
 				fMatchedILS = TRUE;
 				fInRange = TRUE;
@@ -699,7 +1859,7 @@ void DebugRwyAdditions(NAPT * pa, DWORD size)
 		if (fUserAbort) return;
 		
 		fprintf(fpAFDS, "### AFTER RWY: at OFFSET %08X ID=%04X LEN=%d\n",
-			(__int32) ((BYTE *) &pa->wId - nOffsetBase), pa->wId, nThisLen);
+			FileOffset32(&pa->wId), pa->wId, nThisLen);
 		j = nThisLen;
 		while (j--)
 		{	if ((i & 15) == 0)
@@ -852,8 +2012,8 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 	TWHDR *twh0 = twh;
 
 	WORD wGateCtr = 0;
-	NGATE **ppg;
-	NGATE2 **ppg2;
+	NGATE **ppg = NULL;
+	NGATE2 **ppg2 = NULL;
 	LOCATION locg;
 
 	if (pLastSetGateList)
@@ -962,10 +2122,26 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 
 			else
 			{	__int32 wp1x = (-wp1) - 1;
-				SetLocPos(&locg, 0, 
-					ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
-					ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
-					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+				if (ppg2 && ppg2[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg2[wp1x])).nLat,
+						(*(ppg2[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else if (ppg && ppg[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg[wp1x])).nLat,
+						(*(ppg[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else
+				{
+					tw[wPts].fLat = 0.0F;
+					tw[wPts].fLon = 0.0F;
+				}
+
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
 			}
@@ -996,10 +2172,26 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 
 				else
 				{	__int32 wp2x = (-wp2)-1;
-					SetLocPos(&locg, 0,
-						ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
-						ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
-						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+					if (ppg2 && ppg2[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg2[wp2x])).nLat,
+							(*(ppg2[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else if (ppg && ppg[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg[wp2x])).nLat,
+							(*(ppg[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else
+					{
+						tw[wPts].fLat = 0.0F;
+						tw[wPts].fLon = 0.0F;
+					}
+
 					tw[wPts].bOrientation = 0;
 					tw[wPts].bType = 5;
 				}
@@ -1066,24 +2258,19 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 
 	twh->wPoints = 0; // terminator
 
-	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
+{
+	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
 
-	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
+	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
+		TWHDR *twh1 = malloc(32 + nTaxiwayDataSize);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, nTaxiwayDataSize);
 			free(twh0);
 			twh0 = twh1;
 		}
 	}
-
-//	if (pLastSetGateList)
-//	{	free(pLastSetGateList);
-//		pLastSetGateList = 0;
-//	}
-
+}
 	return twh0;
 }
 
@@ -1099,8 +2286,8 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	TWHDR *twh0 = twh;
 
 	WORD wGateCtr = 0;
-	NGATE **ppg;
-	NGATE3 **ppg3;
+	NGATE **ppg = NULL;
+	NGATE3 **ppg3 = NULL;
 	LOCATION locg;
 
 	if (pLastSetGateList)
@@ -1207,10 +2394,27 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 
 			else
 			{	__int32 wp1x = (-wp1) - 1;
-				SetLocPos(&locg, 0, 
-					ppg3 ? (*(ppg3[wp1x])).nLat : (*(ppg[wp1x])).nLat,
-					ppg3 ? (*(ppg3[wp1x])).nLon : (*(ppg[wp1x])).nLon,
-					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+
+				if (ppg3 && ppg3[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg3[wp1x])).nLat,
+						(*(ppg3[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else if (ppg && ppg[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg[wp1x])).nLat,
+						(*(ppg[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else
+				{
+					tw[wPts].fLat = 0.0F;
+					tw[wPts].fLon = 0.0F;
+				}
+
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
 			}
@@ -1240,11 +2444,28 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 				}
 
 				else
-				{	__int32 wp2x = (-wp2)-1;
-					SetLocPos(&locg, 0,
-						ppg3 ? (*(ppg3[wp2x])).nLat : (*(ppg[wp2x])).nLat,
-						ppg3 ? (*(ppg3[wp2x])).nLon : (*(ppg[wp2x])).nLon,
-						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+				{	__int32 wp2x = (-wp2) - 1;
+
+					if (ppg3 && ppg3[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg3[wp2x])).nLat,
+							(*(ppg3[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else if (ppg && ppg[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg[wp2x])).nLat,
+							(*(ppg[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else
+					{
+						tw[wPts].fLat = 0.0F;
+						tw[wPts].fLon = 0.0F;
+					}
+
 					tw[wPts].bOrientation = 0;
 					tw[wPts].bType = 5;
 				}
@@ -1311,24 +2532,19 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 
 	twh->wPoints = 0; // terminator
 
-	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
+{
+	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
 
-	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
+	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
+		TWHDR *twh1 = malloc(32 + nTaxiwayDataSize);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, nTaxiwayDataSize);
 			free(twh0);
 			twh0 = twh1;
 		}
 	}
-
-//	if (pLastSetGateList)
-//	{	free(pLastSetGateList);
-//		pLastSetGateList = 0;
-//	}
-
+}
 	return twh0;
 }
 
@@ -1344,8 +2560,8 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 	TWHDR *twh0 = twh;
 
 	WORD wGateCtr = 0;
-	NGATE **ppg;
-	NGATE2 **ppg2;
+	NGATE **ppg = NULL;
+	NGATE2 **ppg2 = NULL;
 	LOCATION locg;
 
 	if (pLastSetGateList)
@@ -1453,10 +2669,27 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 
 			else
 			{	__int32 wp1x = (-wp1) - 1;
-				SetLocPos(&locg, 0, 
-					ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
-					ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
-					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+
+				if (ppg2 && ppg2[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg2[wp1x])).nLat,
+						(*(ppg2[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else if (ppg && ppg[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg[wp1x])).nLat,
+						(*(ppg[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else
+				{
+					tw[wPts].fLat = 0.0F;
+					tw[wPts].fLon = 0.0F;
+				}
+
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
 			}
@@ -1486,11 +2719,28 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 				}
 
 				else
-				{	__int32 wp2x = (-wp2)-1;
-					SetLocPos(&locg, 0,
-						ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
-						ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
-						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+				{	__int32 wp2x = (-wp2) - 1;
+
+					if (ppg2 && ppg2[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg2[wp2x])).nLat,
+							(*(ppg2[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else if (ppg && ppg[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg[wp2x])).nLat,
+							(*(ppg[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else
+					{
+						tw[wPts].fLat = 0.0F;
+						tw[wPts].fLon = 0.0F;
+					}
+
 					tw[wPts].bOrientation = 0;
 					tw[wPts].bType = 5;
 				}
@@ -1557,24 +2807,19 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 
 	twh->wPoints = 0; // terminator
 
-	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
+{
+	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
 
-	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
+	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
+		TWHDR *twh1 = malloc(32 + nTaxiwayDataSize);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, nTaxiwayDataSize);
 			free(twh0);
 			twh0 = twh1;
 		}
 	}
-
-//	if (pLastSetGateList)
-//	{	free(pLastSetGateList);
-//		pLastSetGateList = 0;
-//	}
-
+}
 	return twh0;
 }
 
@@ -1590,9 +2835,9 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 	TWHDR *twh0 = twh;
 
 	WORD wGateCtr = 0;
-	NGATE **ppg;
-	NGATE2 **ppg2;
-	NGATE3 **ppg3;
+	NGATE **ppg = NULL;
+	NGATE2 **ppg2 = NULL;
+	NGATE3 **ppg3 = NULL;
 	LOCATION locg;
 
 	if (pLastSetGateList)
@@ -1701,10 +2946,34 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 
 			else
 			{	__int32 wp1x = (-wp1) - 1;
-				SetLocPos(&locg, 0, 
-					ppg3 ? (*(ppg3[wp1x])).nLat : ppg2 ? (*(ppg2[wp1x])).nLat : (*(ppg[wp1x])).nLat,
-					ppg3 ? (*(ppg3[wp1x])).nLon : ppg2 ? (*(ppg2[wp1x])).nLon : (*(ppg[wp1x])).nLon,
-					&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+
+				if (ppg3 && ppg3[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg3[wp1x])).nLat,
+						(*(ppg3[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else if (ppg2 && ppg2[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg2[wp1x])).nLat,
+						(*(ppg2[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else if (ppg && ppg[wp1x])
+				{
+					SetLocPos(&locg, 0,
+						(*(ppg[wp1x])).nLat,
+						(*(ppg[wp1x])).nLon,
+						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+				}
+				else
+				{
+					tw[wPts].fLat = 0.0F;
+					tw[wPts].fLon = 0.0F;
+				}
+
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
 			}
@@ -1734,11 +3003,35 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 				}
 
 				else
-				{	__int32 wp2x = (-wp2)-1;
-					SetLocPos(&locg, 0,
-						ppg3 ? (*(ppg3[wp2x])).nLat : ppg2 ? (*(ppg2[wp2x])).nLat : (*(ppg[wp2x])).nLat,
-						ppg3 ? (*(ppg3[wp2x])).nLon : ppg2 ? (*(ppg2[wp2x])).nLon : (*(ppg[wp2x])).nLon,
-						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);								
+				{	__int32 wp2x = (-wp2) - 1;
+
+					if (ppg3 && ppg3[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg3[wp2x])).nLat,
+							(*(ppg3[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else if (ppg2 && ppg2[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg2[wp2x])).nLat,
+							(*(ppg2[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else if (ppg && ppg[wp2x])
+					{
+						SetLocPos(&locg, 0,
+							(*(ppg[wp2x])).nLat,
+							(*(ppg[wp2x])).nLon,
+							&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
+					}
+					else
+					{
+						tw[wPts].fLat = 0.0F;
+						tw[wPts].fLon = 0.0F;
+					}
+
 					tw[wPts].bOrientation = 0;
 					tw[wPts].bType = 5;
 				}
@@ -1805,24 +3098,19 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 
 	twh->wPoints = 0; // terminator
 
-	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
+{
+	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
 
-	if (nAllocSize > ((__int32) &twh[1] - (__int32) twh0))
+	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
-		TWHDR *twh1 = malloc(32 + (__int32) &twh[1] - (__int32) twh0);
+		TWHDR *twh1 = malloc(32 + nTaxiwayDataSize);
 		if (twh1)
-		{	memcpy((BYTE *) twh1, (BYTE *) twh0, (__int32) &twh[1] - (__int32) twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, nTaxiwayDataSize);
 			free(twh0);
 			twh0 = twh1;
 		}
 	}
-
-//	if (pLastSetGateList)
-//	{	free(pLastSetGateList);
-//		pLastSetGateList = 0;
-//	}
-
+}
 	return twh0;
 }
 
@@ -1839,7 +3127,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 	TWHDR* twh0 = twh;
 
 	WORD wGateCtr = 0;
-	NGATE2** ppg4;
+	NGATE2** ppg4 = NULL;
 	LOCATION locg;
 
 	if (pLastSetGateList)
@@ -1956,14 +3244,18 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 			else
 			{
 				__int32 wp1x = (-wp1) - 1;
-				if (ppg4[wp1x])
+
+				if (ppg4 && ppg4[wp1x])
 				{
 					SetLocPos(&locg, 0,
 						(*(ppg4[wp1x])).nLat, (*(ppg4[wp1x])).nLon,
 						&tw[wPts].fLat, &tw[wPts].fLon, 0, 0);
 				}
-				
-				// else fprintf(fpAFDS, "### ERROR in TaxiWay: (wp1x) %d\n", wp1x);
+				else
+				{
+					tw[wPts].fLat = 0.0F;
+					tw[wPts].fLon = 0.0F;
+				}
 
 				tw[wPts].bOrientation = 0;
 				tw[wPts].bType = 5;
@@ -1998,7 +3290,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 				else
 				{
 					__int32 wp2x = (-wp2) - 1;
-					if (ppg4[wp2x])
+					if (ppg4 && ppg4[wp2x])
 					{
 						SetLocPos(&locg, 0,
 							(*(ppg4[wp2x])).nLat, (*(ppg4[wp2x])).nLon,
@@ -2075,25 +3367,19 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 
 	twh->wPoints = 0; // terminator
 
-	//fprintf(fpAFDS, "Taxiway Data Size = %d, Orig Allocation = %d\n",
-	//	(__int32) &twh[1] - (__int32) twh0, nAllocSize);
+{
+	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
 
-	if (nAllocSize > ((__int32)&twh[1] - (__int32)twh0))
+	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
-		TWHDR* twh1 = malloc(32 + (__int32)&twh[1] - (__int32)twh0);
+		TWHDR *twh1 = malloc(32 + nTaxiwayDataSize);
 		if (twh1)
-		{
-			memcpy((BYTE*)twh1, (BYTE*)twh0, (__int32)&twh[1] - (__int32)twh0);
+		{	memcpy((BYTE *) twh1, (BYTE *) twh0, nTaxiwayDataSize);
 			free(twh0);
 			twh0 = twh1;
 		}
 	}
-
-	//	if (pLastSetGateList)
-	//	{	free(pLastSetGateList);
-	//		pLastSetGateList = 0;
-	//	}
-
+}
 	return twh0;
 }
 
@@ -2153,11 +3439,22 @@ void CorrectRunwayMagvar(char *pchICAO, float fNewMagvar)
 		 FindILSdetails
 ******************************************************************************/
 
-void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, __int32 nMode)
-{
-	float fILSHdgMag;
-	__int32 nFreq = MatchILS(nObjs, ps, p, psz, prwy, nMode);
+ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, __int32 nMode)
+ {
+ 	float fILSHdgMag;
+	__int32 nFreq;
 
+	fMatchedGlobalNvxIlsV9 = FALSE;
+	chMatchedGlobalNvxIlsV9Source[0] = 0;
+
+	if (pMSFS2024BGLV9Data && (nMode == 0))
+		nFreq = MatchILSV9(psz, prwy);
+	else
+		nFreq = MatchILS(nObjs, ps, p, psz, prwy, nMode);
+
+	if (!nFreq && (nMode == 0))
+		nFreq = MatchGlobalNvxIlsV9(psz, prwy);
+ 
 	if (!nFreq)
 		return;
 
@@ -2169,11 +3466,18 @@ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, 
 	if (fILSHdgMag <= 0.0F) fILSHdgMag += 360.0F;
 	else if (fILSHdgMag > 360.0F) fILSHdgMag -= 360.0F;
 
-	char wk[8];
-	__int32 l = l = sprintf(wk, "%.3f", (double)fILSHdgMag);
-	if (l > 5) wk[5] = 0;
-	else if (wk[l - 1] == '0') wk[l - 1] = 0;
-	memcpy(prwy->r.chILSHdg, wk, 6);
+	char wk[8] = { 0 };
+	__int32 l = sprintf_s(wk, sizeof(wk), "%.3f", (double)fILSHdgMag);
+
+	if (l < 0)
+		wk[0] = 0;
+	else if (l > 5)
+		wk[5] = 0;
+	else if ((l > 0) && (wk[l - 1] == '0'))
+		wk[l - 1] = 0;
+
+	memset(prwy->r.chILSHdg, 0, sizeof(prwy->r.chILSHdg));
+	memcpy(prwy->r.chILSHdg, wk, sizeof(prwy->r.chILSHdg));
 
 	prwy->r.fILSslope = fILSslope;
 
@@ -2185,6 +3489,14 @@ void FindILSdetails(DWORD nObjs, NSECTS* ps, BYTE* p, char* psz, RWYLIST* prwy, 
 		(prwy->fILSflags & 0x10) ? " DME" : "",
 		(prwy->fILSflags & 0x04) ? " BC" : "",
 		(double) prwy->r.fILSslope, chNameILS);
+
+	if (fMatchedGlobalNvxIlsV9)
+	{
+		fprintf(fpAFDS, " [global NVX/NAX: %s]",
+			chMatchedGlobalNvxIlsV9Source[0]
+				? chMatchedGlobalNvxIlsV9Source
+				: "unknown source");
+	}
 		
 	strncpy(prwy->r.chNameILS, chNameILS, 31);
 	prwy->r.chNameILS[31] = 0;
@@ -2220,15 +3532,121 @@ void GetNameString(char* p)
 }
 
 /******************************************************************************
+		SetICAOFull
+ *****************************************************************************/
+
+ static void SetICAOFull(RWYLIST *pL, const char *pszICAO)
+ {
+	memset(pL->chICAOFull, 0, sizeof(pL->chICAOFull));
+
+	if (pszICAO && pszICAO[0])
+	{
+		strncpy(pL->chICAOFull, pszICAO, sizeof(pL->chICAOFull) - 1);
+		pL->chICAOFull[sizeof(pL->chICAOFull) - 1] = 0;
+	}
+
+ }
+
+/******************************************************************************
+        WriteMSFS2024HelistandCandidate
+******************************************************************************/
+
+void WriteMSFS2024HelistandCandidate(NGATE4 *pg4, char *pszICAO, float fAirportAltFt)
+{
+	static BOOL fHeaderDone = FALSE;
+	FILE *phf;
+	char szHelistandsPath[MAX_PATH];
+	char *pszSlash;
+	double dLat = 0.0;
+	double dLon = 0.0;
+	float fLat = 0.0F;
+	float fLon = 0.0F;
+	WORD wRawNumberType;
+	BYTE bType4;
+	BYTE bType5;
+	WORD wNumber4;
+	WORD wNumber5;
+	unsigned short sDiameterFt;
+
+	if (!pg4 || !pszICAO || !pszICAO[0])
+		return;
+
+	wRawNumberType = pg4->wNumberType;
+	bType4 = (BYTE)(wRawNumberType & 15);
+	bType5 = (BYTE)(wRawNumberType & 31);
+	wNumber4 = (WORD)(wRawNumberType >> 4);
+	wNumber5 = (WORD)(wRawNumberType >> 5);
+
+	sDiameterFt = (unsigned short)(((pg4->fRadius * 2.0F) * 3.28084F) + 0.5F);
+
+	fslat2lat(pg4->nLat, &fLat, &dLat);
+	fslon2lon(pg4->nLon, &fLon, &dLon);
+
+	szHelistandsPath[0] = 0;
+	GetModuleFileName(NULL, szHelistandsPath, MAX_PATH);
+
+	pszSlash = strrchr(szHelistandsPath, '\\');
+	if (pszSlash)
+		*(pszSlash +1) = 0;
+	else
+		szHelistandsPath[0] = 0;
+	
+	strcat_s(szHelistandsPath, MAX_PATH, "helistands_msfs2024.csv");
+
+	phf = fopen(szHelistandsPath, fHeaderDone ? "ab" : "wb");
+
+	if (!phf)
+	{
+		fprintf(fpAFDS,
+		"		WARNING: unable to create %s for %s\n", szHelistandsPath, pszICAO);
+			return;
+	}
+
+	if (!fHeaderDone)
+	{
+		fprintf(phf,
+			"ICAO,Latitude,Longitude,AltitudeFt,Heading,RadiusM,DiameterFt,"
+			"RawNumberType,Type4,Type5,Number4,Number5,Name,Suffix,Source\r\n");
+
+		fHeaderDone = TRUE;
+	}
+
+	fprintf(phf,
+		"%s,%.6f,%.6f,%.0f,%.1f,%.1f,%u,0x%04X,%u,%u,%u,%u,%u,%u,MSFS2024_TaxiwayParking\r\n",
+		pszICAO,
+		fLat,
+		fLon,
+		fAirportAltFt,
+		(double)pg4->fHeading,
+		(double)pg4->fRadius,
+		(unsigned int)sDiameterFt,
+		(unsigned int)wRawNumberType,
+		(unsigned int)bType4,
+		(unsigned int)bType5,
+		(unsigned int)wNumber4,
+		(unsigned int)wNumber5,
+		(unsigned int)(pg4->bPushBackName & 0x3f),
+		(unsigned int)pg4->bSuffix);
+
+	fclose(phf);
+
+	fprintf(fpAFDS,
+		"          MSFS2024 HELISTAND candidate from TaxiwayParking at %s: radius=%.1fm, heading=%.1fT\n",
+		pszICAO,
+		(double)pg4->fRadius,
+		(double)pg4->fHeading);
+}
+
+/******************************************************************************
          NewApts
 ******************************************************************************/
 
 void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pRegion)
 {	DWORD id = 0;
-	char chICAO[6], chILSidP[8], chILSidS[8];
+	char chICAO[9], chILSidP[8], chILSidS[8];
 	char chWork[48], chWork2[16];
 	LOCATION loc;
-	float fMagvar, fHeading, fapLat, fapLon;
+	float fMagvar, fHeading, fapLat, fapLon, fAirportAltFt = 0.0F;
 	RWYLIST rwy1, rwy2, ap;
 	WORD wTpath = 0, wTpnt = 0, wTname = 0;
 	NTAXI *pTpath = 0;
@@ -2258,7 +3676,8 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		if (fUserAbort) return;
 
 		if ((pa->wId == OBJTYPE_AIRPORT) || (pa->wId == OBJTYPE_NEWAIRPORT) ||
-				(pa->wId == OBJTYPE_NEWNEWAIRPORT) || (pa->wId == OBJTYPE_AIRPORT_MSFS))
+				(pa->wId == OBJTYPE_NEWNEWAIRPORT) || (pa->wId == OBJTYPE_AIRPORT_MSFS) ||
+				(pa->wId == OBJTYPE_AIRPORT_MSFS2024))
 		{	// Airport record found
 			if (!fDeletionsPass && ap.fAirport)
 			{	if (nCommStart || nCommDelStart)
@@ -2278,13 +3697,69 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			if (pa->wId == OBJTYPE_AIRPORT) nThisLen -= 4;
 			else if (pa->wId == OBJTYPE_NEWNEWAIRPORT) nThisLen += 4;
 			else if (pa->wId == OBJTYPE_AIRPORT_MSFS) nThisLen += 12;
+			else if (pa->wId == OBJTYPE_AIRPORT_MSFS2024) nThisLen = OBJTYPE_AIRPORT_MSFS2024_LEN;
+
+			if (pa->wId == OBJTYPE_AIRPORT_MSFS2024)
+			{
+				BYTE *pNext = (BYTE *)pa + nThisLen;
+				WORD wNextId = *((WORD *)pNext);
+				DWORD dwNextLen = *((DWORD *)(pNext + 2));
+
+				if ((wNextId == OBJTYPE_NAME) && (dwNextLen > 6) && (dwNextLen < pa->nLen))
+				{
+					NNAM *pn = (NNAM *)pNext;
+					/*
+						Expected pattern example:
+						TT:AIRPORTLR.LLRM.name
+						TT:AIRPORTLR.LL60.name
+					*/
+					{
+						char *p1 = strchr(pn->chName, '.');
+						char *p2 = p1 ? strchr(p1 + 1, '.') : NULL;
+
+						if (p1 && p2)
+						{
+							int n = (int)(p2 - p1 - 1);
+
+							    /*
+									MSFS2024 airport ident:
+									SDK allows 3 to 8 characters.
+									chICAO is 9 bytes: 8 chars + terminating zero.
+								*/
+
+							if ((n >= 3) && (n <= 8) && (n < (int)sizeof(chICAO)))
+							{
+								memset(chICAO, 0, sizeof(chICAO));
+								memcpy(chICAO, p1 + 1, n);
+								chICAO[n] = 0;
+							}
+							else
+							{
+								fprintf(fpAFDS, "          *** WARNING: MSFS2024 airport ICAO not recovered; invalid NAME token length=%d\n", n);
+							}							
+						}
+					}
+				}
+
+				/*
+					In MSFS2024 airport record 0x0113, pa->nId may be zero.
+					Keep id non-zero so following runway records are not skipped.
+				*/
+				if (id == 0)
+					id = 1;
+			}
 
 			if (!fDeletionsPass)
-			{	if (fDebug)	fprintf(fpAFDS,"OFFSET %08X-%08X:  ", (__int32) &pa->wId - nOffsetBase, (__int32) &pa->wId - nOffsetBase + nThisLen);
+			{	
+				if (fDebug)	
+				{__int32 nThisOffset = FileOffset32(&pa->wId);
+				fprintf(fpAFDS, "OFFSET %08X-%08X:  ", nThisOffset, nThisOffset + nThisLen);
+				}
 				
 				fprintf(fpAFDS, "\nAirport %s :", chICAO);
 				
 				SetLocPos(&loc, pa->nAlt, pa->nLat, pa->nLon, &fapLat, &fapLon, 0, 0);
+				fAirportAltFt = ((float)pa->nAlt) * 3.28084F / 1000.0F;
 				fMagvar = 360.0F - pa->fMagVar;
 				if (fMagvar > 180.0F) fMagvar -= 360.0F;
 
@@ -2376,6 +3851,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 				memset(&ap, 0, sizeof(RWYLIST));
 				memcpy(ap.r.chICAO, chICAO, 4);
+				SetICAOFull(&ap, chICAO);
 				ap.r.fAlt = ToFeet(loc.elev/256);
 				ap.r.fLat = fapLat;						
 				ap.r.fLong = fapLon;
@@ -2402,6 +3878,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			memset(&rwy1, 0, sizeof(RWYLIST));
 			memcpy(rwy1.r.chICAO, chICAO, 4);
+			SetICAOFull(&rwy1, chICAO);
 			if (chICAO[3] == 0) rwy1.r.chICAO[3] = ' ';
 
 			if (pd[6] & BIT_DELETE_ALL_TAXIWAYS)
@@ -2492,7 +3969,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				__int32 i, j = 12 + (pd[8] * 4) + (pd[9] * 4);
 				if (!nCommDelStart) nCommDelStart = ftell(fpAFDS);
 				for (i = 0; i < pd[10]; i++) if (pd[j+3] & 0xf0)
-				{	__int32 type = (pd[j+3] >> 28) & 0xff;		//  ########################### ?????????? >>28 on a Byte?
+				{	__int32 type = (pd[j+3] >> 4) & 0xff;
 					fprintf(fpAFDS, "          COM: Delete, Type=%d (%s), Freq=%.2f\n",
 						type, pszComms[(type > 15) ? 16 : type],
 						(double) ((*((__int32 *) &pd[j]) & 0x0fffffff) / 10000) / 100.0);
@@ -2510,12 +3987,13 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			NRWY *pr = (NRWY *) pa;
 			__int32 nFreq = 0, fOk = 0, fList = 0;
 			ANGLE Rlat, Rlong;
-			WORD wSurf = 0;
+			WORD wSurf = 24;
 
 			nThisLen = pr->nLen;
 
 			memset(&rwy1, 0, sizeof(RWYLIST));
 			memcpy(rwy1.r.chICAO, chICAO, 4);
+			SetICAOFull(&rwy1, chICAO);
 			if (chICAO[3] == 0) rwy1.r.chICAO[3] = ' ';
 			rwy1.fMagvar = fMagvar;
 			memcpy(&rwy2, &rwy1, sizeof(RWYLIST));
@@ -2581,19 +4059,12 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					if (psz && psz2 && (psz < psz2))
 					{
 						char szName[32];
-						strncpy(szName, &psz[13], 31);
+						strncpy_s(szName, sizeof(szName), &psz[13], _TRUNCATE);
 						psz = strchr(szName, '\x22');
 						if (psz)
 						{
 							*psz = 0;
-							for (__int32 x = 0; x < 25; x++)
-							{
-								if (_stricmp(szNRwySurf[x], szName) == 0)
-								{
-									wSurf = x;
-									break;
-								}
-							}
+							wSurf = GetMSFS2024RunwaySurfaceLegacyIndex(szName);
 						}
 					}
 				}
@@ -2776,11 +4247,9 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			fprintf(fpAFDS, "\n");			
 		}
 
-		/**********************************************************************
+		
 		else if (id && (pa->wId == OBJTYPE_NAME))
-		{	// Airport name found
-
-			// Find City Name first
+		{	// Airport name found - Find City Name first
 			if (pRegion)
 			{	__int32 nICAOs = pRegion->wIcaoCount;
 				NICAO *pICAOs = (NICAO *) ((BYTE *) pRegion + pRegion->nIcaoPtr);
@@ -2805,12 +4274,17 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				}
 			}
 
-			StoreName(pNextAirportName, (NNAM *) pa);
-			fprintf(fpAFDS, "          Airport Name=\x22%s\x22\n", pNextAirportName);
+			StoreName(pNextAirportName, (NNAM *)pa);
+
+			if (!fDeletionsPass)
+				fprintf(fpAFDS,
+					"          Airport Name=\"%s\"\n",
+					pNextAirportName);
+
 			pApName = pNextAirportName;
 			pNextAirportName += strlen(pNextAirportName) + 1;
 		}
-		//****************************************************************************/
+
 
 		else if (!fDeletionsPass && id && (pa->wId == OBJTYPE_APCOMM))
 		{	// Airport comms record found
@@ -2925,6 +4399,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 			// Will add to data for g5.csv file
 			memset(&rwy1, 0, sizeof(RWYLIST));
 			memcpy(rwy1.r.chICAO, chICAO, 4);
+			SetICAOFull(&rwy1, chICAO);
 			rwy1.pGateList = (NGATEHDR *) malloc(nThisLen);
 			
 			pLastSetGateList = (long long *) malloc(sizeof(__int64) * (wCtr+1));
@@ -2979,7 +4454,15 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 				
 				fprintf(fpAFDS, "              Type %d (%s), Size %.1fm, Hdg %.1fT\n",
 					pg->wNumberType & 15, pszGateType[pg->wNumberType & 15],
-					(double) pg->fRadius, (double) pg->fHeading);	
+					(double) pg->fRadius, (double) pg->fHeading);
+
+				if (pa->wId == OBJTYPE_MSFSTAXIPARK)
+				{
+					NGATE4 *pg4 = (NGATE4 *)pg;
+
+					if ((pg4->wNumberType & 31) == 16)
+						WriteMSFS2024HelistandCandidate(pg4, chICAO, fAirportAltFt);
+				}
 
 				if (pg->bCodeCount & 0x7f)
 				{	BYTE b = pg->bCodeCount & 0x7f;
@@ -2994,7 +4477,6 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 					{	fprintf(fpAFDS, " %.4s", pA);
 						pA += 4;
 					}
-
 					fprintf(fpAFDS, "\n");
 				}
 				
@@ -3213,6 +4695,7 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 		{	// Generate taxiway table for this airport's t5.csv file.
 			memset(&rwy1, 0, sizeof(RWYLIST));
 			memcpy(rwy1.r.chICAO, chICAO, 4);
+			SetICAOFull(&rwy1, chICAO);
 			if (pNTpnt)
 			{	rwy1.pTaxiwayList = 
 					fNewTaxiPath ?
@@ -3271,6 +4754,318 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 }
 
 /******************************************************************************
+         ValidateMSFS2024AirportSubsection
+
+         The QMID index already supplies the number of top-level airport
+         records. Validate those records before handing the payload to
+         NewApts(), and return the exact number of bytes occupied by them.
+******************************************************************************/
+
+static BOOL ValidateMSFS2024AirportSubsection(
+    const BYTE *fileData,
+    DWORD fileSize,
+    DWORD payloadOffset,
+    DWORD payloadSize,
+    DWORD expectedRecords,
+    DWORD *validatedSize)
+{
+    DWORD cursor = payloadOffset;
+    DWORD endOffset;
+    DWORD recordIndex;
+
+    if (validatedSize)
+        *validatedSize = 0;
+
+    if (!fileData || !validatedSize || !expectedRecords)
+        return FALSE;
+
+    if (!IsValidBGLFileRange(payloadOffset, payloadSize, fileSize))
+        return FALSE;
+
+    endOffset = payloadOffset + payloadSize;
+
+    for (recordIndex = 0; recordIndex < expectedRecords; recordIndex++)
+    {
+        WORD recordType;
+        DWORD recordSize;
+
+        if ((endOffset - cursor) < 6)
+            return FALSE;
+
+        recordType = ReadBGLWordLE(fileData + cursor);
+        recordSize = ReadBGLDwordLE(fileData + cursor + 2);
+
+        if (recordType != OBJTYPE_AIRPORT_MSFS2024)
+            return FALSE;
+
+        if ((recordSize < 6) || (recordSize > (endOffset - cursor)))
+            return FALSE;
+
+        cursor += recordSize;
+    }
+
+    *validatedSize = cursor - payloadOffset;
+    return TRUE;
+}
+
+/******************************************************************************
+         CheckMSFS2024BGLV9
+
+         Dedicated MSFS2024 v9 container walker.
+
+         Layer type 3 contains airport-related data, but may also contain
+         other record families, such as the 0x00E8 records found in OBX
+         files. Only subsections beginning with an Airport record 0x0113
+         are passed to NewApts(). It prevents unrelated Terrain
+         Vector DB, 3D Scenery and Airport Name payloads from being treated as
+         linear airport records.
+******************************************************************************/
+
+static BOOL CheckMSFS2024BGLV9(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
+{
+    const BGLV9_FILE_HEADER *header =
+        (const BGLV9_FILE_HEADER *)ph;
+    BYTE *p = NULL;
+    DWORD headerSize;
+    DWORD layerCount;
+    DWORD layerTableSize;
+    DWORD i;
+
+    if (!IsMSFS2024BGLV9(ph, fsize))
+        return FALSE;
+
+    headerSize = header->headerSize;
+    layerCount = header->layerCount;
+
+   /*
+    A v9 container may legitimately contain only the 0x38-byte
+    header and no layer descriptors.
+	*/
+	if (!layerCount)
+		return TRUE;
+
+    if (layerCount > ((DWORD)-1 / (DWORD)sizeof(BGLV9_LAYER_DESCRIPTOR)))
+    {
+        fprintf(fpAFDS,
+            "%s%s\n!!!! FAILED: MSFS2024 BGL v9 layer table overflow\n%s",
+            chLine, szCurrentFilePath, chLine);
+        return TRUE;
+    }
+
+    layerTableSize = layerCount * (DWORD)sizeof(BGLV9_LAYER_DESCRIPTOR);
+
+    if (!IsValidBGLFileRange(headerSize, layerTableSize, fsize))
+    {
+        fprintf(fpAFDS,
+            "%s%s\n!!!! FAILED: MSFS2024 BGL v9 layer table outside file\n%s",
+            chLine, szCurrentFilePath, chLine);
+        return TRUE;
+    }
+
+    p = (BYTE *)malloc(fsize);
+    if (!p)
+    {
+        fprintf(fpAFDS,
+            "%s%s\n!!!! FAILED: unable to allocate MSFS2024 BGL v9 buffer\n%s",
+            chLine, szCurrentFilePath, chLine);
+        return TRUE;
+    }
+
+    fseek(fpIn, 0, SEEK_SET);
+    if (fread(p, 1, fsize, fpIn) != fsize)
+    {
+        free(p);
+        fprintf(fpAFDS,
+            "%s%s\n!!!! FAILED: error reading MSFS2024 BGL v9 file\n%s",
+            chLine, szCurrentFilePath, chLine);
+        return TRUE;
+    }
+
+    pOffsetBase = p;
+	pMSFS2024BGLV9Data = p;
+	nMSFS2024BGLV9FileSize = fsize;
+	nMSFS2024BGLV9HeaderSize = headerSize;
+	nMSFS2024BGLV9LayerCount = layerCount;
+	BuildGlobalNvxIlsV9Index();
+    ulTotalBytes += fsize - headerSize;
+
+    if (!fDeletionsPass)
+    {
+        fprintf(fpAFDS, "%s%s\n%s", chLine, szCurrentFilePath, chLine);
+        fprintf(fpAFDS,
+            "MSFS2024 BGL v9: headerSize=0x%lX layers=%lu\n",
+            (unsigned long)headerSize,
+            (unsigned long)layerCount);
+    }
+
+    for (i = 0; i < layerCount; i++)
+    {
+        const BYTE *layer = p + headerSize + (i * (DWORD)sizeof(BGLV9_LAYER_DESCRIPTOR));
+        DWORD layerType = ReadBGLDwordLE(layer);
+        DWORD modeFlags = ReadBGLDwordLE(layer + 4);
+        DWORD subsectionCount = ReadBGLDwordLE(layer + 8);
+        DWORD indexOffset = ReadBGLDwordLE(layer + 12);
+        DWORD indexSize = ReadBGLDwordLE(layer + 16);
+        DWORD indexStride =
+    		(modeFlags & BGLV9_QMID64_FLAG)
+        		? (DWORD)sizeof(BGLV9_QMID64_ENTRY)
+        		: (DWORD)sizeof(BGLV9_QMID32_ENTRY);
+        DWORD requiredIndexSize;
+        DWORD j;
+
+        if (layerType != BGLV9_LAYER_AIRPORT)
+            continue;
+
+        if (subsectionCount > ((DWORD)-1 / indexStride))
+        {
+            fprintf(fpAFDS,
+                "    *** INVALID MSFS2024 Airport subsection count: %lu\n",
+				(unsigned long)subsectionCount);
+            continue;
+        }
+
+        requiredIndexSize = subsectionCount * indexStride;
+
+        if ((indexSize < requiredIndexSize) ||
+            !IsValidBGLFileRange(indexOffset, indexSize, fsize))
+        {
+            fprintf(fpAFDS,
+                "    *** INVALID MSFS2024 Airport subsection table\n");
+            continue;
+        }
+
+        for (j = 0; j < subsectionCount; j++)
+        {
+            const BYTE *entry = p + indexOffset + (j * indexStride);
+            DWORD itemCount;
+            DWORD payloadOffset;
+            DWORD payloadSize;
+            DWORD validatedSize = 0;
+
+            if (modeFlags & BGLV9_QMID64_FLAG)
+            {
+                itemCount = ReadBGLDwordLE(entry + 8);
+                payloadOffset = ReadBGLDwordLE(entry + 12);
+                payloadSize = ReadBGLDwordLE(entry + 16);
+            }
+            else
+            {
+                itemCount = ReadBGLDwordLE(entry + 4);
+                payloadOffset = ReadBGLDwordLE(entry + 8);
+                payloadSize = ReadBGLDwordLE(entry + 12);
+            }
+
+            if (fUserAbort)
+            {
+				pMSFS2024BGLV9Data = NULL;
+                nMSFS2024BGLV9FileSize = 0;
+                nMSFS2024BGLV9HeaderSize = 0;
+                nMSFS2024BGLV9LayerCount = 0;
+                pOffsetBase = NULL;
+                free(p);
+                return TRUE;
+            }
+
+           /*
+				An empty QMID subsection requires no processing.
+			*/
+			if (!itemCount)
+				continue;
+
+			/*
+				Validate the payload range before reading its first record type.
+				This remains a structural error regardless of the record family.
+			*/
+			if (!IsValidBGLFileRange(
+					payloadOffset,
+					payloadSize,
+					fsize) ||
+				(payloadSize < sizeof(WORD)))
+			{
+				fprintf(fpAFDS,
+					"    *** INVALID MSFS2024 layer 3 subsection %lu: "
+					"records=%lu payload=0x%08lX size=0x%08lX\n",
+					(unsigned long)j,
+					(unsigned long)itemCount,
+					(unsigned long)payloadOffset,
+					(unsigned long)payloadSize);
+
+				continue;
+			}
+
+			/*
+				Layer type 3 contains airport-related data, but it is not
+				guaranteed to contain Airport records.
+
+				Airport records use top-level type 0x0113.
+				OBX object records such as 0x00E8 are valid but are not handled
+				by NewApts(), so their entire subsection is skipped silently.
+			*/
+			if (ReadBGLWordLE(p + payloadOffset) !=
+				OBJTYPE_AIRPORT_MSFS2024)
+			{
+				continue;
+			}
+
+			/*
+				From this point the subsection is expected to contain a sequence
+				of MSFS2024 Airport records.
+			*/
+			if (!ValidateMSFS2024AirportSubsection(
+					p,
+					fsize,
+					payloadOffset,
+					payloadSize,
+					itemCount,
+					&validatedSize))
+			{
+				fprintf(fpAFDS,
+					"    *** INVALID MSFS2024 Airport subsection %lu: "
+					"records=%lu payload=0x%08lX size=0x%08lX\n",
+					(unsigned long)j,
+					(unsigned long)itemCount,
+					(unsigned long)payloadOffset,
+					(unsigned long)payloadSize);
+
+				continue;
+			}
+
+            if (validatedSize != payloadSize)
+			{
+				fprintf(fpAFDS,
+					"    *** WARNING: MSFS2024 Airport subsection %lu has "
+					"%lu trailing bytes; payload=0x%08lX size=0x%08lX "
+					"validated=0x%08lX\n",
+					(unsigned long)j,
+					(unsigned long)(payloadSize - validatedSize),
+					(unsigned long)payloadOffset,
+					(unsigned long)payloadSize,
+					(unsigned long)validatedSize);
+			}
+
+            if (fDeletionsPass)
+                fDeletionsPass = -1;
+
+            NewApts(
+                (NAPT *)(p + payloadOffset),
+                validatedSize,
+				0,
+				NULL,
+                p,
+                NULL);
+        }
+    }
+
+	pMSFS2024BGLV9Data = NULL;
+    nMSFS2024BGLV9FileSize = 0;
+    nMSFS2024BGLV9HeaderSize = 0;
+    nMSFS2024BGLV9LayerCount = 0;
+    pOffsetBase = NULL;
+    free(p);
+    return TRUE;
+}
+
+/******************************************************************************
          CheckNewBGL
 ******************************************************************************/
 
@@ -3280,6 +5075,10 @@ void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 	BOOL fRegion = FALSE;
 	DWORD i, j, k;
 	BYTE *p = NULL;
+
+	/* Dedicated parser for the MSFS2024 v9 container. */
+	if (CheckMSFS2024BGLV9(fpIn, ph, fsize))
+		return;
 
 	if (ph->nObjects > NSECTS_PER_FILE)
 	{	fprintf(fpAFDS, "%s%s\n!!!! FAILED: too many sections (%d)\n%s",
@@ -3299,7 +5098,7 @@ void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 			{	// Read complete file
 				p = (BYTE *) malloc(fsize);
 				ulTotalBytes += fsize - sizeof(NBGLHDR);
-				nOffsetBase = (__int32) p;
+				pOffsetBase = p;
 
 				fseek(fpIn, 0, SEEK_SET);
 				if (!p || (fread(p, 1, fsize, fpIn) != fsize))
@@ -3346,13 +5145,43 @@ void CheckNewBGL(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 				}
 
 				if (fDeletionsPass) fDeletionsPass = -1;
-				NewApts((NAPT *) &p[po->chunkoff], po->chunksize, ph->nObjects, ps, p, pRegion);
+				//NewApts((NAPT *) &p[po->chunkoff], po->chunksize, ph->nObjects, ps, p, pRegion);
+				fprintf(fpAFDS,
+					"    AIRPORT CHUNK: chunkoff=0x%08lX chunksize=%lu fileSize=%lu",
+					(unsigned long)po->chunkoff,
+					(unsigned long)po->chunksize,
+					(unsigned long)fsize);
+
+				if (po->chunkoff >= fsize)
+				{
+					fprintf(fpAFDS, "  *** INVALID chunkoff >= fileSize\n");
+				}
+				else if ((po->chunkoff + po->chunksize) > fsize)
+				{
+					fprintf(fpAFDS, "  *** INVALID chunk outside file\n");
+				}
+				else if (po->chunksize < 8)
+				{
+					fprintf(fpAFDS, "  *** INVALID chunksize too small\n");
+				}
+				else
+				{
+					NAPT *dbgpa = (NAPT *)&p[po->chunkoff];
+
+					fprintf(fpAFDS,
+						"  firstRecord: wId=0x%04X nLen=%u\n",
+						dbgpa->wId,
+						dbgpa->nLen);
+
+					NewApts((NAPT *) &p[po->chunkoff], po->chunksize, ph->nObjects, ps, p, pRegion);
+				}				
 				offs += sizeof(NOBJ);
 			}
 		}
 	}
 
 	if (p) free(p);
+	pOffsetBase = NULL;
 }
 
 /******************************************************************************

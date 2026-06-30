@@ -5,6 +5,7 @@
          Structs
 ******************************************************************************/
 
+#include <windows.h>
 #pragma pack(push, 1)
 
 typedef struct _nbglhdr
