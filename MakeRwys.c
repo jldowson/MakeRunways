@@ -2112,7 +2112,7 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 		SendMessage(hWnd, WM_CLOSE, 0, 0);
 		return 0;
 	}
-	fprintf(fpAFDS, "Make Runways File: Version 5.132 by Pete Dowson, updates by Gjanosh61\n");	
+	fprintf(fpAFDS, "Make Runways File: Version 5.133 by Pete Dowson\n");	
 	fflush(fpAFDS);
 	
 	// Need to locate current SCENERY.CFG elsewhere if this is FSX ...
