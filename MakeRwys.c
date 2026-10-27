@@ -1709,31 +1709,51 @@ __int32 nOther = 0;
 
 BOOL AddMSFS2024VFSSceneryFolders(void)
 {
-	char szVFSBase[MY_MAX_PATH];
+	char szVFSBase[MY_MAX_PATH] = { 0 };
 	char szSearchPath[MY_MAX_PATH];
-	char *pszLocalAppData;
+	char* pszLocalAppData;
+	char* pszAppData;
 	HANDLE hFind;
 	WIN32_FIND_DATA fd;
 	int nAdded = 0;
 
 	pszLocalAppData = getenv("LOCALAPPDATA");
+	pszAppData = getenv("APPDATA");
 
 	if (!pszLocalAppData || !pszLocalAppData[0])
 	{
-		fprintf(fpAFDS, "MSFS v2: LOCALAPPDATA not available.\n");
+		fprintf(fpAFDS, "MSFS2024 v2: LOCALAPPDATA not available.\n");
 		fflush(fpAFDS);
-		return FALSE;
+	}
+	else
+	{
+		strcpy_s(szVFSBase, MY_MAX_PATH, pszLocalAppData);
+		strcat_s(szVFSBase, MY_MAX_PATH, "\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalState\\VFSProjection\\scenery\\");
 	}
 
-	strcpy_s(szVFSBase, MY_MAX_PATH, pszLocalAppData);
-	strcat_s(szVFSBase, MY_MAX_PATH, "\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalState\\VFSProjection\\scenery\\");
+	// Check if folder exists
+	if (GetFileAttributes(szVFSBase) == INVALID_FILE_ATTRIBUTES)
+	{
+		if (!pszAppData || !pszAppData[0])
+		{
+			fprintf(fpAFDS, "MSFS2024 v2:APPDATA not available.\n");
+			fflush(fpAFDS);
+			return FALSE;
+		}
+		else
+		{
+			strcpy_s(szVFSBase, MY_MAX_PATH, pszAppData);
+			strcat_s(szVFSBase, MY_MAX_PATH, "\\Microsoft Flight Simulator 2024\\\VFSProjection\\scenery\\");
+		}
+	}
 
-	fprintf(fpAFDS, "\nChecking MSFS v2 VFS Projection scenery:\n   \"%s\"\n", szVFSBase);
+
+	fprintf(fpAFDS, "\nChecking MSFS2024 v2 VFS Projection scenery:\n   \"%s\"\n", szVFSBase);
 	fflush(fpAFDS);
 
 	if (GetFileAttributes(szVFSBase) == INVALID_FILE_ATTRIBUTES)
 	{
-		fprintf(fpAFDS, "    ---- MSFS v2 VFS Projection scenery not found.\n");
+		fprintf(fpAFDS, "    ---- MSFS2024 v2 VFS Projection scenery not found.\n");
 		fprintf(fpAFDS, "\nTo scan MSFS2024 streamed scenery:\n");
 		fprintf(fpAFDS, " 1. Start MSFS2024\n");
 		fprintf(fpAFDS, " 2. Enable Developer Mode\n");
