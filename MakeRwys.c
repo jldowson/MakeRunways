@@ -18,7 +18,7 @@ BOOL fUTF8Output = FALSE; // Default legacy: Windows-1252. Use /UTF8 for UTF-8 X
 BOOL fBglCompXmlOutput = FALSE; // Experimental MSFS2024 SDK/BglComp XML export.
 char chBglCompICAOFilter[9] = ""; // Optional /BGLCOMPICAO=<ident> filter.
 char *pLocPak = NULL, *pContent = NULL, *pMaterials = NULL;
-__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6, 8 MSFS, 9 MSFS V2
+__int32 nVersion = -1;// <0 FS9, 0 FSX, 1 FSX-SE, 2 Prepar3D, 3 Prepar3D v2, 4 Prepar3D v3, 5 Prepar3D v4, 6 Prepar3D v5, 7 Prepar3D v6, 8 MSFS2020, 9 MSFS2024
 
 
 BOOL fDoMSFS = TRUE;
@@ -37,7 +37,7 @@ extern char chWk[1024];
 void UpdateTransitionAlts(void);
 char *pszSimName[11] = {
 	"FS9", "FSX", "FSX-SE", "Prepar3D", "Prepar3D v2",
-	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "Prepar3D v6", "MSFS", "MSFS v2" };
+	"Prepar3D v3", "Prepar3D v4", "Prepar3D v5", "Prepar3D v6", "MSFS2020", "MSFS2024" };
 char *pPathName = 0;
 char *pSceneryName = 0;
 HINSTANCE hInstance;

@@ -4821,6 +4821,7 @@ static BOOL ValidateMSFS2024AirportSubsection(
          linear airport records.
 ******************************************************************************/
 
+extern __int32 nVersion;
 static BOOL CheckMSFS2024BGLV9(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
 {
     const BGLV9_FILE_HEADER *header =
@@ -4831,7 +4832,7 @@ static BOOL CheckMSFS2024BGLV9(FILE *fpIn, NBGLHDR *ph, DWORD fsize)
     DWORD layerTableSize;
     DWORD i;
 
-    if (!IsMSFS2024BGLV9(ph, fsize))
+    if ((nVersion != 9) || !IsMSFS2024BGLV9(ph, fsize))
         return FALSE;
 
     headerSize = header->headerSize;
