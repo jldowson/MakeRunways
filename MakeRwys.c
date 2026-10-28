@@ -1722,7 +1722,7 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 
 	if (!pszLocalAppData || !pszLocalAppData[0])
 	{
-		fprintf(fpAFDS, "MSFS2024 v2: LOCALAPPDATA not available.\n");
+		fprintf(fpAFDS, "MSFS2024: LOCALAPPDATA not available.\n");
 		fflush(fpAFDS);
 	}
 	else
@@ -1736,7 +1736,7 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 	{
 		if (!pszAppData || !pszAppData[0])
 		{
-			fprintf(fpAFDS, "MSFS2024 v2:APPDATA not available.\n");
+			fprintf(fpAFDS, "MSFS2024: APPDATA not available.\n");
 			fflush(fpAFDS);
 			return FALSE;
 		}
@@ -1748,12 +1748,12 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 	}
 
 
-	fprintf(fpAFDS, "\nChecking MSFS2024 v2 VFS Projection scenery:\n   \"%s\"\n", szVFSBase);
+	fprintf(fpAFDS, "\nChecking MSFS2024 VFS Projection scenery:\n   \"%s\"\n", szVFSBase);
 	fflush(fpAFDS);
 
 	if (GetFileAttributes(szVFSBase) == INVALID_FILE_ATTRIBUTES)
 	{
-		fprintf(fpAFDS, "    ---- MSFS2024 v2 VFS Projection scenery not found.\n");
+		fprintf(fpAFDS, "    ---- MSFS2024 VFS Projection scenery not found.\n");
 		fprintf(fpAFDS, "\nTo scan MSFS2024 streamed scenery:\n");
 		fprintf(fpAFDS, " 1. Start MSFS2024\n");
 		fprintf(fpAFDS, " 2. Enable Developer Mode\n");
@@ -1775,12 +1775,12 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 
 	if (hFind == INVALID_HANDLE_VALUE)
 	{
-		fprintf(fpAFDS, "    ---- Cannot enumerate MSFS v2 VFS scenery folders;\n");
+		fprintf(fpAFDS, "    ---- Cannot enumerate MSFS2024 VFS scenery folders;\n");
 		fflush(fpAFDS);
 		return FALSE;
 	}
 
-	fprintf(fpAFDS, "\nAdding MSFS v2 VFS scenery folders:\n");
+	fprintf(fpAFDS, "\nAdding MSFS2024 VFS scenery folders:\n");
 
 
 	do
@@ -1825,7 +1825,7 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 
 	FindClose(hFind);
 
-	fprintf(fpAFDS, "MSFS v2 VFS folder added: %d\n", nAdded);
+	fprintf(fpAFDS, "MSFS2024 VFS folder added: %d\n", nAdded);
 	fflush(fpAFDS);
 
 
@@ -2187,8 +2187,8 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 	{	// See if it is MSFS, in MS Store location
 		char szCopyPath[MY_MAX_PATH];
 
-		// First try MSFS v2 / MSFS2024 via Virtual File System projection
-		fprintf(fpAFDS, "\nDEBUG: MSFS branch reached. Trying MSFS v2 VFS Projection first.\n");
+		// First try MSFS2024 via Virtual File System projection
+		fprintf(fpAFDS, "\nDEBUG: MSFS branch reached. Trying MSFS2024 VFS Projection first.\n");
 		fflush(fpAFDS);
 		strncpy(szLocalPath, szMyPath, nMyPathLen);
 		szLocalPath[nMyPathLen] = 0;
@@ -2198,15 +2198,15 @@ DWORD WINAPI MainRoutine (PVOID pvoid)
 			fMSFS = TRUE;
 			nVersion = 9;
 
-			fprintf(fpAFDS, "\nMSFS v2 VFS Projection found and selected.\n");
-			fprintf(fpAFDS, "\n\nReading MSFS v2 scenery via VFS Projection:\n");
+			fprintf(fpAFDS, "\nMSFS2024 VFS Projection found and selected.\n");
+			fprintf(fpAFDS, "\n\nReading MSFS2024 scenery via VFS Projection:\n");
 			fflush(fpAFDS);
 
 			CompleteTables();
 			goto MAINLOOPS;
 		}
 
-		fprintf(fpAFDS, "\nMSFS v2 VFS Projection not selected. Falling back to MSFS legacy scan.\n\n");
+		fprintf(fpAFDS, "\nMSFS2024 VFS Projection not selected. Falling back to MSFS legacy scan.\n\n");
 		fflush(fpAFDS);
 
 		//strcpy(szCfgPath, "\\\\?\\");
