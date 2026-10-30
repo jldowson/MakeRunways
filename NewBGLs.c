@@ -10,7 +10,7 @@ extern char szParkNames[12][5];
 extern char *pszParkType[];
 extern char szCurrentFilePath[MAX_PATH];
 __int64 *pLastSetGateList = 0;
-__int32 fDeletionsPass = 0, nMinRunwayLen = 0; //1500
+__int32 fDeletionsPass = 0, nMinRunwayLen = 1500; 
 BYTE *pOffsetBase = NULL;
 
 static WORD ReadBGLWordLE(const BYTE *p)
