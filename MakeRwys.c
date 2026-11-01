@@ -3027,6 +3027,7 @@ MAINLOOPS:
 				fOk |= 2;
 			}
 
+		WriteMSFS2024HeliportsFile();
 		WriteBglCompXmlFile();
 
 		while (pR)
