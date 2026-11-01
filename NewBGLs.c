@@ -3711,43 +3711,70 @@ void NewApts(NAPT *pa, DWORD size, DWORD nObjs, NSECTS *ps, BYTE *p, NREGION *pR
 
 			if (pa->wId == OBJTYPE_AIRPORT_MSFS2024)
 			{
-				BYTE *pNext = (BYTE *)pa + nThisLen;
-				WORD wNextId = *((WORD *)pNext);
-				DWORD dwNextLen = *((DWORD *)(pNext + 2));
-
-				if ((wNextId == OBJTYPE_NAME) && (dwNextLen > 6) && (dwNextLen < pa->nLen))
+				if ((DWORD)nThisLen <= pa->nLen)
 				{
-					NNAM *pn = (NNAM *)pNext;
-					/*
-						Expected pattern example:
-						TT:AIRPORTLR.LLRM.name
-						TT:AIRPORTLR.LL60.name
-					*/
+					const BYTE *pNext = (const BYTE *)pa + nThisLen;
+					DWORD remaining = pa->nLen - (DWORD)nThisLen;
+
+					/* NAME may be preceded by other airport subrecords. */
+					while (remaining >= 6)
 					{
-						char *p1 = strchr(pn->chName, '.');
-						char *p2 = p1 ? strchr(p1 + 1, '.') : NULL;
+						WORD childType = ReadBGLWordLE(pNext);
+						DWORD childSize = ReadBGLDwordLE(pNext + 2);
 
-						if (p1 && p2)
+						if ((childSize < 6) || (childSize > remaining))
+							break;
+
+						if (childType == OBJTYPE_NAME)
 						{
-							int n = (int)(p2 - p1 - 1);
+							const char *name = (const char *)(pNext + 6);
+							size_t length = childSize - 6;
+							const char *dot;
 
-							    /*
-									MSFS2024 airport ident:
-									SDK allows 3 to 8 characters.
-									chICAO is 9 bytes: 8 chars + terminating zero.
-								*/
-
-							if ((n >= 3) && (n <= 8) && (n < (int)sizeof(chICAO)))
+							/* Expected token: TT:AIRPORTxx.IDENT.name */
+							if ((length >= 10) &&
+								!memcmp(name, "TT:AIRPORT", 10))
 							{
-								memset(chICAO, 0, sizeof(chICAO));
-								memcpy(chICAO, p1 + 1, n);
-								chICAO[n] = 0;
+								dot = (const char *)memchr(name, '.', length);
+								if (dot)
+								{
+									size_t tail =
+										length - (size_t)(dot + 1 - name);
+									const char *end = (const char *)
+										memchr(dot + 1, '.', tail);
+
+									if (end)
+									{
+										size_t n = (size_t)(end - dot - 1);
+										size_t suffix =
+											length - (size_t)(end - name);
+										size_t i;
+
+										if ((n >= 3) && (n <= 8) &&
+											(n < sizeof(chICAO)) &&
+											(suffix >= 5) &&
+											!memcmp(end, ".name", 5) &&
+											((suffix == 5) || (end[5] == '\0')))
+										{
+											for (i = 0; i < n; ++i)
+												if (!isalnum(
+													(unsigned char)dot[1 + i]))
+													break;
+
+											if (i == n)
+											{
+												memset(chICAO, 0, sizeof(chICAO));
+												memcpy(chICAO, dot + 1, n);
+												break;
+											}
+										}
+									}
+								}
 							}
-							else
-							{
-								fprintf(fpAFDS, "          *** WARNING: MSFS2024 airport ICAO not recovered; invalid NAME token length=%d\n", n);
-							}							
 						}
+
+						pNext += childSize;
+						remaining -= childSize;
 					}
 				}
 
