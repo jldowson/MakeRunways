@@ -2007,7 +2007,9 @@ void WriteFSM(RWYLIST *pAp)
 TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
 	__int32 wp1, wp2;
-	__int32 nAllocSize = (40*wP) + (32*wT*wP);
+	/* At most one header and two points per path, plus a terminator. */
+	size_t nAllocSize = ((size_t)wP + 1) * sizeof(TWHDR)
+		+ (size_t)wP * 2 * sizeof(TW);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -2025,7 +2027,7 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 	}
 
 	if (!twh)
-	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %zu bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
 			nAllocSize, wT, wP, wN);
 		return 0;
 	}
@@ -2259,7 +2261,7 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 	twh->wPoints = 0; // terminator
 
 {
-	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
+	size_t nTaxiwayDataSize = (size_t)((BYTE *) &twh[1] - (BYTE *) twh0);
 
 	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
@@ -2281,7 +2283,9 @@ TWHDR *MakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WO
 TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
 	__int32 wp1, wp2;
-	__int32 nAllocSize = (40*wP) + (32*wT*wP);
+	/* At most one header and two points per path, plus a terminator. */
+	size_t nAllocSize = ((size_t)wP + 1) * sizeof(TWHDR)
+		+ (size_t)wP * 2 * sizeof(TW);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -2297,7 +2301,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	}
 
 	if (!twh)
-	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %zu bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
 			nAllocSize, wT, wP, wN);
 		return 0;
 	}
@@ -2533,7 +2537,7 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 	twh->wPoints = 0; // terminator
 
 {
-	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
+	size_t nTaxiwayDataSize = (size_t)((BYTE *) &twh[1] - (BYTE *) twh0);
 
 	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
@@ -2555,7 +2559,9 @@ TWHDR *MakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NTAXI *pP, WORD wT, WORD wN,
 TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
 	__int32 wp1, wp2;
-	__int32 nAllocSize = (40*wP) + (32*wT*wP);
+	/* At most one header and two points per path, plus a terminator. */
+	size_t nAllocSize = ((size_t)wP + 1) * sizeof(TWHDR)
+		+ (size_t)wP * 2 * sizeof(TW);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -2572,7 +2578,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 	}
 
 	if (!twh)
-	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %zu bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
 			nAllocSize, wT, wP, wN);
 		return 0;
 	}
@@ -2808,7 +2814,7 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 	twh->wPoints = 0; // terminator
 
 {
-	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
+	size_t nTaxiwayDataSize = (size_t)((BYTE *) &twh[1] - (BYTE *) twh0);
 
 	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
@@ -2830,7 +2836,9 @@ TWHDR *NewMakeTaxiwayList(NTAXIPT *pT, NTAXINM *pN, NEWNTAXI *pP, WORD wT, WORD 
 TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, WORD wN, WORD wP)
 {	WORD wo = wN, w2;
 	__int32 wp1, wp2;
-	__int32 nAllocSize = (40*wP) + (32*wT*wP);
+	/* At most one header and two points per path, plus a terminator. */
+	size_t nAllocSize = ((size_t)wP + 1) * sizeof(TWHDR)
+		+ (size_t)wP * 2 * sizeof(TW);
 	TWHDR *twh = (TWHDR *) malloc(nAllocSize);
 	TWHDR *twh0 = twh;
 
@@ -2849,7 +2857,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 	}
 
 	if (!twh)
-	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+	{	fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %zu bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
 			nAllocSize, wT, wP, wN);
 		return 0;
 	}
@@ -3099,7 +3107,7 @@ TWHDR *NewMakeTaxiwayList2(NEWTAXIPT *pT, NTAXINM *pN, NEWNTAXI2 *pP, WORD wT, W
 	twh->wPoints = 0; // terminator
 
 {
-	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
+	size_t nTaxiwayDataSize = (size_t)((BYTE *) &twh[1] - (BYTE *) twh0);
 
 	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
@@ -3122,7 +3130,9 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 {
 	WORD wo = wN, w2;
 	__int32 wp1, wp2;
-	__int32 nAllocSize = (40 * wP) + (32 * wT * wP);
+		/* At most one header and two points per path, plus a terminator. */
+	size_t nAllocSize = ((size_t)wP + 1) * sizeof(TWHDR)
+		+ (size_t)wP * 2 * sizeof(TW);
 	TWHDR* twh = (TWHDR*)malloc(nAllocSize);
 	TWHDR* twh0 = twh;
 
@@ -3137,7 +3147,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 
 	if (!twh)
 	{
-		fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %d bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
+		fprintf(fpAFDS, "  ##### Error making Taxiway list: Need %zu bytes memory block, not available!\n        (%d Points, %d Paths, %d Names)\n",
 			nAllocSize, wT, wP, wN);
 		return 0;
 	}
@@ -3368,7 +3378,7 @@ TWHDR* NewMakeTaxiwayList3(NTAXIPT* pT, NTAXINM* pN, MSFSNTAXI* pP, WORD wT, WOR
 	twh->wPoints = 0; // terminator
 
 {
-	__int32 nTaxiwayDataSize = (__int32)((BYTE *) &twh[1] - (BYTE *) twh0);
+	size_t nTaxiwayDataSize = (size_t)((BYTE *) &twh[1] - (BYTE *) twh0);
 
 	if ((nTaxiwayDataSize > 0) && (nAllocSize > nTaxiwayDataSize))
 	{	// Revise allocation to suit needs
