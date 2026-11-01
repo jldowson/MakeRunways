@@ -1743,7 +1743,7 @@ BOOL AddMSFS2024VFSSceneryFolders(void)
 		else
 		{
 			strcpy_s(szVFSBase, MY_MAX_PATH, pszAppData);
-			strcat_s(szVFSBase, MY_MAX_PATH, "\\Microsoft Flight Simulator 2024\\\VFSProjection\\scenery\\");
+			strcat_s(szVFSBase, MY_MAX_PATH, "\\Microsoft Flight Simulator 2024\\VFSProjection\\scenery\\");
 		}
 	}
 
