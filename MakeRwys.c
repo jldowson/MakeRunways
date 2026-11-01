@@ -3077,7 +3077,7 @@ INT_PTR CALLBACK DlgProc(HWND hDlg, UINT msg, WPARAM wParam, LPARAM lParam)
 	switch (msg)
 	{	case WM_INITDIALOG:
 			hbrMain = CreateSolidBrush(GetSysColor(COLOR_BTNFACE));
-			SetWindowText(hDlg, "Make Runways: Version 5.132 by Pete Dowson, updates by Gjanosh61");
+			SetWindowText(hDlg, "Make Runways: Version 5.133 by Pete Dowson");
 			if (fQuiet) ShowWindow(hDlg, SW_HIDE);
 			return TRUE;
 
