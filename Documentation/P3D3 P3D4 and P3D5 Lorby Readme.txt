@@ -21,7 +21,6 @@ C:\Program Files\Lockheed Martin\Prepar3D v3
 Please note that Windows will ask you to accept the file in this location.
 
 ***************************************************************************
-
 Using the app:
 
 1. LorbySceneryExporter will request full administrator privileges, so it is able to access all config files.

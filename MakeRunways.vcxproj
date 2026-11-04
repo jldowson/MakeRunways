@@ -164,6 +164,17 @@
     <ClCompile Include="MakeRwys.c" />
     <ClCompile Include="NewBGLs.c" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Documentation\BGL File Format - FSDeveloper Wiki.pdf" />
+    <None Include="Documentation\FS9 FSX_BGL_Format.pdf" />
+    <None Include="Documentation\MakeRwys README.odt" />
+    <None Include="Documentation\MakeRwys README.pdf" />
+    <None Include="Documentation\New BGL File structure.pdf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="Documentation\MakeRwys ReadMe.txt" />
+    <Text Include="Documentation\P3D3 P3D4 and P3D5 Lorby Readme.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
